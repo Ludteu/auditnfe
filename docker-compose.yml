@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nfe_emitter
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: nfe_emitter
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      PORT: 5000
+      NODE_ENV: development
+      JWT_SECRET: troque-esta-chave-em-producao
+      JWT_EXPIRE: 7d
+      SEFAZ_ENV: homologacao
+      SEFAZ_UF: SP
+      SEFAZ_TIMEOUT: 30000
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./server:/app/server
+
+volumes:
+  db_data:

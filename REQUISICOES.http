@@ -1,0 +1,169 @@
+### Configuração base
+@baseUrl = http://localhost:5000/api
+@token = seu_token_jwt_aqui
+
+### ========================
+### AUTENTICAÇÃO
+### ========================
+
+### 1. Registrar novo usuário
+POST {{baseUrl}}/auth/registrar
+Content-Type: application/json
+
+{
+  "nome": "Empresa Test LTDA",
+  "email": "teste@empresa.com",
+  "cnpj": "12345678000191",
+  "senha": "senha123456",
+  "razaoSocial": "Empresa Test Razão Social LTDA"
+}
+
+### 2. Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "teste@empresa.com",
+  "senha": "senha123456"
+}
+
+### 3. Validar token
+GET {{baseUrl}}/auth/validar
+Authorization: Bearer {{token}}
+
+### ========================
+### USUÁRIOS E CERTIFICADOS
+### ========================
+
+### 4. Obter perfil do usuário
+GET {{baseUrl}}/usuarios/perfil
+Authorization: Bearer {{token}}
+
+### 5. Atualizar perfil
+PUT {{baseUrl}}/usuarios/perfil
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nome": "Empresa Test Atualizada",
+  "razaoSocial": "Nova Razão Social"
+}
+
+### 6. Listar certificados do usuário
+GET {{baseUrl}}/usuarios/certificados
+Authorization: Bearer {{token}}
+
+### 7. Adicionar certificado digital
+POST {{baseUrl}}/usuarios/certificados
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cnpj": "12345678000191",
+  "validoAte": "2025-12-31",
+  "descricao": "Certificado principal",
+  "caminhoArquivo": "/certs/certificado.pfx"
+}
+
+### 8. Ativar certificado específico
+PUT {{baseUrl}}/usuarios/certificados/{certificado_id}/ativar
+Authorization: Bearer {{token}}
+
+### 9. Deletar certificado
+DELETE {{baseUrl}}/usuarios/certificados/{certificado_id}
+Authorization: Bearer {{token}}
+
+### ========================
+### NF-ES - LISTAGEM E BUSCA
+### ========================
+
+### 10. Listar NF-es com filtros
+GET {{baseUrl}}/nfe?status=autorizada&cnpj=12345678000191&pagina=1&limite=20
+Authorization: Bearer {{token}}
+
+### 11. Listar NF-es pendentes
+GET {{baseUrl}}/nfe?status=pendente&pagina=1&limite=50
+Authorization: Bearer {{token}}
+
+### 12. Listar NF-es por período
+GET {{baseUrl}}/nfe?dataInicio=2024-01-01&dataFim=2024-12-31
+Authorization: Bearer {{token}}
+
+### 13. Buscar NF-e por chave
+GET {{baseUrl}}/nfe/buscar?chaveNFe=3523064177666000165550010000000001173450123
+Authorization: Bearer {{token}}
+
+### 14. Buscar NF-e por número e série
+GET {{baseUrl}}/nfe/buscar?numero=123&serie=1&cnpj=12345678000191
+Authorization: Bearer {{token}}
+
+### 15. Buscar NF-e por status
+GET {{baseUrl}}/nfe/buscar?statusSEFAZ=autorizada
+Authorization: Bearer {{token}}
+
+### 16. Obter detalhes de uma NF-e específica
+GET {{baseUrl}}/nfe/{nfe_id}
+Authorization: Bearer {{token}}
+
+### ========================
+### NF-ES - OPERAÇÕES
+### ========================
+
+### 17. Criar nova NF-e
+POST {{baseUrl}}/nfe
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "xmlContent": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<NFe>\n  <infNfe Id=\"NFe12345678901234567890123456789012345678901234\">\n    <ide>\n      <cUF>35</cUF>\n      <natOp>VENDA</natOp>\n      <mod>55</mod>\n      <serie>1</serie>\n      <nNF>123</nNF>\n      <dhEmi>2024-01-15T10:00:00</dhEmi>\n      <tpAmb>2</tpAmb>\n    </ide>\n    <emit>\n      <CNPJ>12345678000191</CNPJ>\n      <xNome>Empresa Emitente LTDA</xNome>\n    </emit>\n    <dest>\n      <CNPJ>98765432000199</CNPJ>\n      <xNome>Cliente Destino LTDA</xNome>\n    </dest>\n    <det nItem=\"1\">\n      <prod>\n        <code>12345</code>\n        <xProd>Produto Teste</xProd>\n        <qCom>10.0000</qCom>\n        <vUnCom>100.00</vUnCom>\n      </prod>\n    </det>\n  </infNfe>\n</NFe>",
+  "cnpj": "12345678000191",
+  "numero": 123,
+  "serie": 1,
+  "valor": 1000.00,
+  "nomeCliente": "Cliente Destino LTDA",
+  "cpfCnpjCliente": "98765432000199"
+}
+
+### 18. Assinar NF-e
+POST {{baseUrl}}/nfe/{nfe_id}/assinar
+Authorization: Bearer {{token}}
+
+### 19. Enviar NF-e para SEFAZ
+POST {{baseUrl}}/nfe/{nfe_id}/enviar
+Authorization: Bearer {{token}}
+
+### 20. Consultar status na SEFAZ
+GET {{baseUrl}}/nfe/{chaveNFe}/status
+Authorization: Bearer {{token}}
+
+### 21. Obter XML formatado
+GET {{baseUrl}}/nfe/{nfe_id}/xml
+Authorization: Bearer {{token}}
+
+### ========================
+### HEALTH CHECK
+### ========================
+
+### 22. Verificar status do servidor
+GET {{baseUrl}}/health
+
+### ========================
+### NOTAS
+### ========================
+###
+### Para usar este arquivo:
+### 1. Instale a extensão REST Client no VSCode
+### 2. Substitua {{token}} pelo token JWT recebido no login
+### 3. Substitua {nfe_id} pelo ID de uma NF-e
+### 4. Substitua {chaveNFe} pela chave de 44 dígitos
+### 5. Substitua {certificado_id} pelo ID do certificado
+###
+### Workflow recomendado:
+### 1. Execute requisição 1 (registrar) ou 2 (login)
+### 2. Copie o token retornado para @token
+### 3. Execute 4 (obter perfil) - verifica se autenticado
+### 4. Execute 7 (adicionar certificado) - se não tiver
+### 5. Execute 17 (criar NF-e)
+### 6. Execute 18 (assinar NF-e)
+### 7. Execute 19 (enviar para SEFAZ)
+### 8. Execute 20 (consultar status)

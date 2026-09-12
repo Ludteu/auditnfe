@@ -1,0 +1,108 @@
+### Configuração base
+@baseUrl = http://localhost:5000/api
+@token = seu_token_jwt_aqui
+@produtoId = uuid_do_produto_aqui
+
+### ========================
+### PRODUTOS
+### ========================
+
+### 1. Cadastrar produto
+POST {{baseUrl}}/estoque/produtos
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "codigo": "SKU-001",
+  "descricao": "Parafuso M6",
+  "unidade": "UN",
+  "quantidade": 100,
+  "estoqueMinimo": 20,
+  "precoCusto": 0.50,
+  "precoVenda": 1.20,
+  "ncm": "73181500"
+}
+
+### 2. Listar produtos
+GET {{baseUrl}}/estoque/produtos?pagina=1&limite=20
+Authorization: Bearer {{token}}
+
+### 3. Buscar produtos por código/descrição
+GET {{baseUrl}}/estoque/produtos?busca=parafuso
+Authorization: Bearer {{token}}
+
+### 4. Obter produto específico
+GET {{baseUrl}}/estoque/produtos/{{produtoId}}
+Authorization: Bearer {{token}}
+
+### 5. Atualizar produto
+PUT {{baseUrl}}/estoque/produtos/{{produtoId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "precoVenda": 1.35,
+  "estoqueMinimo": 25
+}
+
+### 6. Inativar produto
+DELETE {{baseUrl}}/estoque/produtos/{{produtoId}}
+Authorization: Bearer {{token}}
+
+### ========================
+### MOVIMENTAÇÕES
+### ========================
+
+### 7. Registrar entrada (atualiza preço médio de custo)
+POST {{baseUrl}}/estoque/entrada
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "produtoId": "{{produtoId}}",
+  "quantidade": 50,
+  "precoUnitario": 0.55,
+  "motivo": "Compra NF 1234"
+}
+
+### 8. Registrar saída (valida saldo disponível)
+POST {{baseUrl}}/estoque/saida
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "produtoId": "{{produtoId}}",
+  "quantidade": 10,
+  "motivo": "Venda NF 5678"
+}
+
+### 9. Ajuste de inventário
+POST {{baseUrl}}/estoque/ajuste
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "produtoId": "{{produtoId}}",
+  "novaQuantidade": 130,
+  "motivo": "Contagem de inventário mensal"
+}
+
+### ========================
+### CONSULTAS
+### ========================
+
+### 10. Alertas de estoque mínimo
+GET {{baseUrl}}/estoque/alertas
+Authorization: Bearer {{token}}
+
+### 11. Histórico de movimentações
+GET {{baseUrl}}/estoque/historico?pagina=1&limite=50
+Authorization: Bearer {{token}}
+
+### 12. Histórico filtrado por produto e período
+GET {{baseUrl}}/estoque/historico?produtoId={{produtoId}}&tipo=entrada&dataInicio=2026-01-01&dataFim=2026-01-31
+Authorization: Bearer {{token}}
+
+### 13. Relatório consolidado de estoque
+GET {{baseUrl}}/estoque/relatorio
+Authorization: Bearer {{token}}

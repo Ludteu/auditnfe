@@ -1,0 +1,83 @@
+### Configuração base
+@baseUrl = http://localhost:5000/api
+@token = seu_token_jwt_aqui
+@nfeId = uuid_da_nfe_aqui
+@produtoId = uuid_do_produto_aqui
+
+### ========================
+### EXTRAÇÃO DE TRIBUTAÇÃO
+### ========================
+
+### 1. Extrair tributação de uma NF-e já cadastrada
+POST {{baseUrl}}/fiscal/tributacao/extrair
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "nfeId": "{{nfeId}}"
+}
+
+### 2. Extrair tributação de um XML enviado diretamente
+POST {{baseUrl}}/fiscal/tributacao/extrair
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "xmlContent": "<?xml version=\"1.0\"?><NFe>...</NFe>"
+}
+
+### 3. Aplicar dados extraídos a um produto
+POST {{baseUrl}}/fiscal/tributacao/produtos
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "produtoId": "{{produtoId}}",
+  "ncm": "73181500",
+  "cfop": "5102",
+  "icms": { "cst": "00", "aliquota": 18 },
+  "ipi": { "cst": "50", "aliquota": 5 }
+}
+
+### 4. Atualizar tributação de um produto manualmente
+PUT {{baseUrl}}/fiscal/tributacao/{{produtoId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "icms": { "aliquota": 12 }
+}
+
+### ========================
+### RESUMO FISCAL
+### ========================
+
+### 5. Resumo fiscal do período
+POST {{baseUrl}}/fiscal/tributacao/resumo
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "dataInicio": "2026-01-01",
+  "dataFim": "2026-01-31"
+}
+
+### ========================
+### SPED / EFD
+### ========================
+
+### 6. Gerar EFD-ICMS/IPI simplificado (retorna JSON com o conteúdo)
+POST {{baseUrl}}/fiscal/sped/efd
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "dataInicio": "2026-01-01",
+  "dataFim": "2026-01-31",
+  "cnpj": "12345678000191",
+  "razaoSocial": "Empresa LTDA"
+}
+
+### 7. Baixar diretamente o arquivo EFD (.txt)
+GET {{baseUrl}}/fiscal/sped/efd/download?dataInicio=2026-01-01&dataFim=2026-01-31&cnpj=12345678000191&razaoSocial=Empresa LTDA
+Authorization: Bearer {{token}}
