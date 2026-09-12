@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>NFe Emitter — Console de Testes</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171e2e;
+    --panel-border: #2a3346;
+    --text: #e7ecf5;
+    --muted: #8b96ac;
+    --accent: #4f8cff;
+    --ok: #2fbf71;
+    --err: #ff5d6c;
+    --mono: 'Consolas', 'SFMono-Regular', Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; font-size: 13px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .card h2 {
+    font-size: 14px;
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #232c3f;
+    color: var(--muted);
+  }
+  .badge.on { background: rgba(47,191,113,0.15); color: var(--ok); }
+  .badge.off { background: rgba(255,93,108,0.15); color: var(--err); }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+  input {
+    width: 100%;
+    padding: 7px 9px;
+    border-radius: 6px;
+    border: 1px solid var(--panel-border);
+    background: #0d1220;
+    color: var(--text);
+    font-size: 13px;
+  }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  button {
+    margin-top: 12px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: none;
+    background: var(--accent);
+    color: white;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  button.secondary { background: #2a3346; }
+  button:hover { filter: brightness(1.1); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  pre {
+    margin-top: 10px;
+    background: #0a0e18;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 10px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    max-height: 220px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .stat-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .stat {
+    background: #0d1220;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    flex: 1;
+    min-width: 110px;
+  }
+  .stat .v { font-size: 18px; font-weight: 700; }
+  .stat .k { font-size: 11px; color: var(--muted); }
+  #globalStatus { margin-bottom: 16px; font-size: 12px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>🚀 NFe Emitter — Console de Testes</h1>
+<p class="sub">Interface de testes que fala direto com a API em <code>/api</code>. Não é o frontend final do produto — serve para validar visualmente que o backend (auth, estoque, tributação, EFD) está funcionando.</p>
+<div id="globalStatus">Verificando servidor... <span id="healthBadge" class="badge">...</span></div>
+
+<div class="grid">
+
+  <div class="card">
+    <h2>1. Autenticação <span id="authBadge" class="badge off">sem token</span></h2>
+    <label>Nome</label><input id="regNome" value="Empresa Demo">
+    <label>Email</label><input id="regEmail" value="">
+    <label>CNPJ (14 dígitos)</label><input id="regCnpj" value="12345678000191">
+    <label>Senha</label><input id="regSenha" value="senha123456">
+    <div class="row">
+      <button onclick="registrar()">Registrar</button>
+      <button class="secondary" onclick="login()">Login</button>
+    </div>
+    <pre id="outAuth">—</pre>
+  </div>
+
+  <div class="card">
+    <h2>2. Estoque — Produto</h2>
+    <label>Código</label><input id="prodCodigo" value="SKU-001">
+    <label>Descrição</label><input id="prodDesc" value="Parafuso M6">
+    <div class="row">
+      <div><label>Qtd inicial</label><input id="prodQtd" value="100"></div>
+      <div><label>Estoque mínimo</label><input id="prodMin" value="20"></div>
+    </div>
+    <div class="row">
+      <div><label>Preço custo</label><input id="prodCusto" value="0.50"></div>
+      <div><label>Preço venda</label><input id="prodVenda" value="1.20"></div>
+    </div>
+    <label>NCM</label><input id="prodNcm" value="73181500">
+    <button onclick="criarProduto()">Cadastrar produto</button>
+    <pre id="outProduto">—</pre>
+  </div>
+
+  <div class="card">
+    <h2>3. Movimentação de Estoque</h2>
+    <div class="row">
+      <div><label>Entrada — qtd</label><input id="entQtd" value="50"></div>
+      <div><label>Preço unitário</label><input id="entPreco" value="0.55"></div>
+    </div>
+    <button onclick="entrada()">Registrar entrada</button>
+    <div class="row">
+      <div><label>Saída — qtd</label><input id="saiQtd" value="10"></div>
+    </div>
+    <button class="secondary" onclick="saida()">Registrar saída</button>
+    <pre id="outMov">—</pre>
+    <div class="stat-row" id="statsEstoque"></div>
+  </div>
+
+  <div class="card">
+    <h2>4. NF-e + Tributação</h2>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 8px">Cria uma NF-e com um XML de amostra (1 item: Parafuso M6, ICMS 18%, IPI 5%) e extrai a tributação automaticamente.</p>
+    <button onclick="criarNfeEExtrair()">Criar NF-e e extrair tributação</button>
+    <pre id="outNfe">—</pre>
+  </div>
+
+  <div class="card">
+    <h2>5. Resumo Fiscal e EFD</h2>
+    <div class="row">
+      <div><label>Data início</label><input id="dtIni" value="2026-01-01"></div>
+      <div><label>Data fim</label><input id="dtFim" value="2026-12-31"></div>
+    </div>
+    <button onclick="resumoFiscal()">Resumo fiscal</button>
+    <button class="secondary" onclick="gerarEfd()">Gerar EFD</button>
+    <pre id="outFiscal">—</pre>
+  </div>
+
+</div>
+
+<script>
+const baseUrl = '/api';
+let token = null;
+
+function show(id, data) {
+  document.getElementById(id).textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+}
+
+async function api(method, path, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch(baseUrl + path, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+async function checkHealth() {
+  try {
+    const r = await api('GET', '/health');
+    const badge = document.getElementById('healthBadge');
+    if (r.ok) {
+      badge.textContent = 'online';
+      badge.className = 'badge on';
+      document.getElementById('globalStatus').innerHTML = 'Servidor respondendo em <code>/api/health</code> — ' + r.data.timestamp + ' <span id="healthBadge" class="badge on">online</span>';
+    } else throw new Error('status ' + r.status);
+  } catch (e) {
+    document.getElementById('globalStatus').innerHTML = '❌ Servidor não respondeu: ' + e.message;
+  }
+}
+
+function setAuthBadge(on) {
+  const b = document.getElementById('authBadge');
+  b.textContent = on ? 'autenticado' : 'sem token';
+  b.className = 'badge ' + (on ? 'on' : 'off');
+}
+
+document.getElementById('regEmail').value = 'demo' + Date.now() + '@empresa.com';
+
+async function registrar() {
+  const r = await api('POST', '/auth/registrar', {
+    nome: document.getElementById('regNome').value,
+    email: document.getElementById('regEmail').value,
+    cnpj: document.getElementById('regCnpj').value,
+    senha: document.getElementById('regSenha').value
+  });
+  show('outAuth', r.data);
+  if (r.ok) { token = r.data.token; setAuthBadge(true); }
+}
+
+async function login() {
+  const r = await api('POST', '/auth/login', {
+    email: document.getElementById('regEmail').value,
+    senha: document.getElementById('regSenha').value
+  });
+  show('outAuth', r.data);
+  if (r.ok) { token = r.data.token; setAuthBadge(true); }
+}
+
+let produtoId = null;
+
+async function criarProduto() {
+  const r = await api('POST', '/estoque/produtos', {
+    codigo: document.getElementById('prodCodigo').value,
+    descricao: document.getElementById('prodDesc').value,
+    quantidade: Number(document.getElementById('prodQtd').value),
+    estoqueMinimo: Number(document.getElementById('prodMin').value),
+    precoCusto: Number(document.getElementById('prodCusto').value),
+    precoVenda: Number(document.getElementById('prodVenda').value),
+    ncm: document.getElementById('prodNcm').value
+  });
+  show('outProduto', r.data);
+  if (r.ok) produtoId = r.data.produto.id;
+  atualizarStatsEstoque();
+}
+
+async function entrada() {
+  if (!produtoId) return show('outMov', 'Cadastre um produto primeiro (passo 2).');
+  const r = await api('POST', '/estoque/entrada', {
+    produtoId,
+    quantidade: Number(document.getElementById('entQtd').value),
+    precoUnitario: Number(document.getElementById('entPreco').value),
+    motivo: 'Compra de demonstração'
+  });
+  show('outMov', r.data);
+  atualizarStatsEstoque();
+}
+
+async function saida() {
+  if (!produtoId) return show('outMov', 'Cadastre um produto primeiro (passo 2).');
+  const r = await api('POST', '/estoque/saida', {
+    produtoId,
+    quantidade: Number(document.getElementById('saiQtd').value),
+    motivo: 'Venda de demonstração'
+  });
+  show('outMov', r.data);
+  atualizarStatsEstoque();
+}
+
+async function atualizarStatsEstoque() {
+  const r = await api('GET', '/estoque/relatorio');
+  if (!r.ok) return;
+  const s = r.data;
+  document.getElementById('statsEstoque').innerHTML = `
+    <div class="stat"><div class="v">${s.totalProdutos}</div><div class="k">produtos</div></div>
+    <div class="stat"><div class="v">R$ ${s.valorTotalCusto}</div><div class="k">custo total</div></div>
+    <div class="stat"><div class="v">R$ ${s.valorTotalVenda}</div><div class="k">valor de venda</div></div>
+    <div class="stat"><div class="v">${s.itensAbaixoMinimo}</div><div class="k">abaixo do mínimo</div></div>
+  `;
+}
+
+let nfeId = null;
+
+function xmlAmostra() {
+  const chave = '35' + String(Date.now()).slice(-30).padStart(30, '0');
+  return `<?xml version="1.0" encoding="UTF-8"?><NFe xmlns="http://www.portalfiscal.inf.br/nfe"><infNfe Id="NFe${chave}" versao="4.00"><ide><cUF>35</cUF></ide><emit><CNPJ>${document.getElementById('regCnpj').value}</CNPJ></emit><dest><CNPJ>98765432000199</CNPJ></dest><det nItem="1"><prod><cProd>${document.getElementById('prodCodigo').value}</cProd><xProd>${document.getElementById('prodDesc').value}</xProd><NCM>${document.getElementById('prodNcm').value}</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>10.0000</qCom><vUnCom>1.2000</vUnCom><vProd>12.00</vProd></prod><imposto><ICMS><ICMS00><orig>0</orig><CST>00</CST><modBC>3</modBC><vBC>12.00</vBC><pICMS>18.00</pICMS><vICMS>2.16</vICMS></ICMS00></ICMS><IPI><IPITrib><CST>50</CST><vBC>12.00</vBC><pIPI>5.00</pIPI><vIPI>0.60</vIPI></IPITrib></IPI></imposto></det></infNfe></NFe>`;
+}
+
+async function criarNfeEExtrair() {
+  const criar = await api('POST', '/nfe', {
+    xmlContent: xmlAmostra(),
+    cnpj: document.getElementById('regCnpj').value,
+    numero: Math.floor(Math.random() * 100000),
+    serie: 1,
+    valor: 12.00,
+    nomeCliente: 'Cliente Demo',
+    cpfCnpjCliente: '98765432000199'
+  });
+  if (!criar.ok) return show('outNfe', criar.data);
+  nfeId = criar.data.nfe.id;
+
+  const extrair = await api('POST', '/fiscal/tributacao/extrair', { nfeId });
+  show('outNfe', { nfeCriada: { id: nfeId, chave: criar.data.nfe.chaveNFe }, tributacaoExtraida: extrair.data });
+}
+
+async function resumoFiscal() {
+  const r = await api('POST', '/fiscal/tributacao/resumo', {
+    dataInicio: document.getElementById('dtIni').value,
+    dataFim: document.getElementById('dtFim').value
+  });
+  show('outFiscal', r.data);
+}
+
+async function gerarEfd() {
+  const r = await api('POST', '/fiscal/sped/efd', {
+    dataInicio: document.getElementById('dtIni').value,
+    dataFim: document.getElementById('dtFim').value,
+    cnpj: document.getElementById('regCnpj').value,
+    razaoSocial: document.getElementById('regNome').value
+  });
+  show('outFiscal', r.data);
+}
+
+checkHealth();
+</script>
+
+</body>
+</html>

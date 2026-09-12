@@ -21,6 +21,9 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Pasta de uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Console de testes (interface HTML simples que consome a API)
+app.use(express.static(path.join(__dirname, 'public')));
+
 // Rotas
 app.use('/api/auth', authRoutes);
 app.use('/api/usuarios', usuarioRoutes);
