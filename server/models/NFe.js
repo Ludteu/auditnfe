@@ -15,6 +15,18 @@ const NFe = sequelize.define('NFe', {
       key: 'id'
     }
   },
+  destinatarioId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    references: {
+      model: 'destinatarios',
+      key: 'id'
+    }
+  },
+  naturezaOperacao: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   chaveNFe: {
     type: DataTypes.STRING(44),
     allowNull: false,

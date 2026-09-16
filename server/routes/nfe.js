@@ -21,9 +21,16 @@ router.get('/buscar', nfeController.buscar);
 
 /**
  * POST /api/nfe
- * Criar nova NF-e
+ * Criar nova NF-e a partir de um XML já pronto (fluxo avançado/import)
  */
 router.post('/', nfeController.criar);
+
+/**
+ * POST /api/nfe/emitir
+ * Emitir NF-e a partir de destinatário + itens do catálogo — monta o XML,
+ * sugere CFOP/CST/CSOSN automaticamente e baixa o estoque (ver EMISSAO.md)
+ */
+router.post('/emitir', nfeController.emitir);
 
 /**
  * GET /api/nfe/:id

@@ -72,14 +72,16 @@ const registrarEntrada = async (usuarioId, { produtoId, quantidade, precoUnitari
 };
 
 /**
- * Registra saída de estoque, validando saldo disponível
+ * Registra saída de estoque, validando saldo disponível.
+ * Aceita uma transação externa (ex: emissão de NF-e com vários itens
+ * precisando ser tudo-ou-nada) — sem ela, abre a própria transação.
  */
-const registrarSaida = async (usuarioId, { produtoId, quantidade, motivo, nfeId }) => {
+const registrarSaida = async (usuarioId, { produtoId, quantidade, motivo, nfeId }, transacaoExterna) => {
   if (!quantidade || quantidade <= 0) {
     throw new Error('Quantidade de saída deve ser maior que zero');
   }
 
-  return sequelize.transaction(async (t) => {
+  const executar = async (t) => {
     const produto = await Produto.findOne({
       where: { id: produtoId, usuarioId },
       transaction: t,
@@ -112,7 +114,9 @@ const registrarSaida = async (usuarioId, { produtoId, quantidade, motivo, nfeId 
     }, { transaction: t });
 
     return { produto, movimentacao };
-  });
+  };
+
+  return transacaoExterna ? executar(transacaoExterna) : sequelize.transaction(executar);
 };
 
 /**

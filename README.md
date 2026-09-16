@@ -2,7 +2,7 @@
 
 Sistema para emissão e gestão de Notas Fiscais Eletrônicas (NF-e), controle de estoque e extração automática de tributação com geração de arquivo EFD-ICMS/IPI simplificado.
 
-Veja [RUN.md](RUN.md) para o guia rápido de execução (Docker, Linux/Mac, Windows).
+Veja [RUN.md](RUN.md) para o guia rápido de execução (Docker, Linux/Mac, Windows) e [EMISSAO.md](EMISSAO.md) para a tela de emissão (`/emitir.html`) — destinatário + itens do catálogo, CFOP/CST automáticos, numeração e baixa de estoque.
 
 ## 📋 Características
 
@@ -179,7 +179,18 @@ GET /api/nfe?status=autorizada&cnpj=12345678000191&pagina=1&limite=20
 GET /api/nfe/buscar?chaveNFe=3523064177666000165550010000000001173450123&cnpj=12345678000191
 ```
 
-#### Criar NF-e
+#### Emitir NF-e a partir de destinatário + itens do catálogo (ver EMISSAO.md)
+```http
+POST /api/nfe/emitir
+Content-Type: application/json
+
+{
+  "destinatarioId": "uuid-do-cliente",
+  "itens": [{ "produtoId": "uuid-do-produto", "quantidade": 3 }]
+}
+```
+
+#### Criar NF-e a partir de um XML já pronto (fluxo avançado/import)
 ```http
 POST /api/nfe
 Content-Type: application/json
@@ -379,6 +390,28 @@ curl -X GET "http://localhost:5000/api/nfe/buscar?chaveNFe=352306417766600016555
 - ativo (BOOLEAN)
 - descricao (VARCHAR)
 - createdAt / updatedAt
+```
+
+### Tabela: destinatarios
+```sql
+- id (UUID)
+- usuarioId (UUID, FK)
+- nome, cpfCnpj (VARCHAR) -- único por usuário
+- contribuinteIcms (BOOLEAN), inscricaoEstadual (VARCHAR)
+- uf, cidade, cep, logradouro, numero, bairro
+- ativo (BOOLEAN)
+- createdAt / updatedAt
+```
+
+### Tabela: itens_nfe
+```sql
+- id (UUID)
+- nfeId (UUID, FK)
+- produtoId (UUID, FK)
+- codigo, descricao, ncm, cfop, unidade
+- quantidade, valorUnitario, valorTotal (DECIMAL)
+- tabelaIcms (CST|CSOSN), codigoIcms, icmsAliquota, icmsValor
+- cstIpi, ipiAliquota, ipiValor
 ```
 
 ### Tabela: produtos

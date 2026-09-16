@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   senha VARCHAR NOT NULL,
   razaoSocial VARCHAR,
   regimeTributario VARCHAR(20),
+  uf VARCHAR(2),
   ativo BOOLEAN DEFAULT true,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -42,10 +43,34 @@ CREATE INDEX IF NOT EXISTS idx_certificados_cnpj ON certificados(cnpj);
 CREATE INDEX IF NOT EXISTS idx_certificados_ativo ON certificados(ativo);
 CREATE INDEX IF NOT EXISTS idx_certificados_valido ON certificados(validoAte);
 
+-- Tabela de destinatários (clientes)
+CREATE TABLE IF NOT EXISTS destinatarios (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  usuarioId UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  nome VARCHAR NOT NULL,
+  cpfCnpj VARCHAR(14) NOT NULL,
+  contribuinteIcms BOOLEAN DEFAULT false,
+  inscricaoEstadual VARCHAR,
+  email VARCHAR,
+  telefone VARCHAR,
+  uf VARCHAR(2) NOT NULL,
+  cidade VARCHAR,
+  cep VARCHAR(8),
+  logradouro VARCHAR,
+  numero VARCHAR,
+  bairro VARCHAR,
+  ativo BOOLEAN DEFAULT true,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (usuarioId, cpfCnpj)
+);
+
 -- Tabela de NF-es
 CREATE TABLE IF NOT EXISTS nfes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   usuarioId UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  destinatarioId UUID REFERENCES destinatarios(id),
+  naturezaOperacao VARCHAR,
   chaveNFe VARCHAR(44) UNIQUE NOT NULL,
   cnpj VARCHAR(14) NOT NULL,
   numero INTEGER NOT NULL,
@@ -134,9 +159,37 @@ CREATE INDEX IF NOT EXISTS idx_movimentacoes_usuario_produto ON movimentacoes_es
 ALTER TABLE movimentacoes_estoque ADD CONSTRAINT chk_tipo_movimentacao
   CHECK (tipo IN ('entrada', 'saida', 'ajuste'));
 
+-- Tabela de itens de NF-e (linhas emitidas pelo fluxo POST /api/nfe/emitir)
+CREATE TABLE IF NOT EXISTS itens_nfe (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  nfeId UUID NOT NULL REFERENCES nfes(id) ON DELETE CASCADE,
+  produtoId UUID REFERENCES produtos(id),
+  codigo VARCHAR NOT NULL,
+  descricao VARCHAR NOT NULL,
+  ncm VARCHAR(8),
+  cfop VARCHAR(4) NOT NULL,
+  unidade VARCHAR(6) DEFAULT 'UN',
+  quantidade DECIMAL(15, 3) NOT NULL,
+  valorUnitario DECIMAL(15, 4) NOT NULL,
+  valorTotal DECIMAL(15, 2) NOT NULL,
+  tabelaIcms VARCHAR(5),
+  codigoIcms VARCHAR(3),
+  icmsAliquota DECIMAL(5, 2) DEFAULT 0,
+  icmsValor DECIMAL(15, 2) DEFAULT 0,
+  cstIpi VARCHAR(2),
+  ipiAliquota DECIMAL(5, 2) DEFAULT 0,
+  ipiValor DECIMAL(15, 2) DEFAULT 0,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_itens_nfe_nfeid ON itens_nfe(nfeId);
+
 -- Comentários nas tabelas
 COMMENT ON TABLE usuarios IS 'Usuários da plataforma com informações de empresa';
 COMMENT ON TABLE certificados IS 'Certificados digitais dos usuários para assinatura';
 COMMENT ON TABLE nfes IS 'Notas Fiscais Eletrônicas emitidas';
 COMMENT ON TABLE produtos IS 'Produtos cadastrados com dados de estoque e tributação';
 COMMENT ON TABLE movimentacoes_estoque IS 'Histórico de entradas, saídas e ajustes de estoque';
+COMMENT ON TABLE destinatarios IS 'Clientes (destinatários de NF-e) cadastrados por usuário';
+COMMENT ON TABLE itens_nfe IS 'Linhas de produto de uma NF-e emitida via POST /api/nfe/emitir';

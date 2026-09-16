@@ -37,6 +37,10 @@ const Usuario = sequelize.define('Usuario', {
     type: DataTypes.ENUM('simples_nacional', 'lucro_presumido', 'lucro_real'),
     allowNull: true
   },
+  uf: {
+    type: DataTypes.STRING(2),
+    allowNull: true
+  },
   ativo: {
     type: DataTypes.BOOLEAN,
     defaultValue: true

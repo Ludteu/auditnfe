@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Emitir NF-e</title>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --panel: #141b2b;
+    --panel-2: #0f1524;
+    --border: #262f45;
+    --text: #e9edf7;
+    --muted: #8b97b0;
+    --accent: #5b8cff;
+    --accent-dim: rgba(91,140,255,0.12);
+    --ok: #2fbf71;
+    --ok-dim: rgba(47,191,113,0.12);
+    --warn: #e0a63e;
+    --warn-dim: rgba(224,166,62,0.12);
+    --err: #ff5d6c;
+    --err-dim: rgba(255,93,108,0.12);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  header h1 { font-size: 16px; margin: 0; display: flex; align-items: center; gap: 8px; }
+  header .empresa { font-size: 12px; color: var(--muted); }
+  main { max-width: 920px; margin: 0 auto; padding: 20px 24px 80px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: 14px;
+    margin: 0 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card .hint { font-size: 12px; color: var(--muted); margin: 0 0 14px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  input, select {
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text);
+    font-size: 13.5px;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  button {
+    padding: 9px 14px;
+    border-radius: 7px;
+    border: none;
+    background: var(--accent);
+    color: white;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.danger { background: var(--err-dim); color: var(--err); }
+  button.small { padding: 5px 9px; font-size: 12px; }
+  button:hover { filter: brightness(1.08); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .pill {
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--muted);
+  }
+  .pill.ok { background: var(--ok-dim); color: var(--ok); }
+  .pill.warn { background: var(--warn-dim); color: var(--warn); }
+  .pill.err { background: var(--err-dim); color: var(--err); }
+  .search-wrap { position: relative; }
+  .dropdown {
+    position: absolute;
+    left: 0; right: 0; top: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-top: 4px;
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 20;
+  }
+  .dropdown-item {
+    padding: 9px 11px;
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+  }
+  .dropdown-item:last-child { border-bottom: none; }
+  .dropdown-item:hover { background: var(--accent-dim); }
+  .dropdown-item .sub { color: var(--muted); font-size: 11.5px; }
+  .chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 8px;
+  }
+  .chip .name { font-weight: 600; font-size: 13.5px; }
+  .chip .meta { font-size: 11.5px; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+  th, td { padding: 8px 6px; border-bottom: 1px solid var(--border); text-align: left; }
+  th { color: var(--muted); font-weight: 500; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em; }
+  td input { padding: 5px 6px; font-size: 12.5px; }
+  .totais { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+  .totais .item {
+    flex: 1; min-width: 130px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .totais .item .v { font-size: 18px; font-weight: 700; }
+  .totais .item .k { font-size: 11px; color: var(--muted); }
+  .avisos { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--warn-dim); border: 1px solid rgba(224,166,62,0.3); font-size: 12px; color: var(--warn); }
+  .avisos li { margin-bottom: 4px; }
+  .resultado { margin-top: 14px; padding: 12px 14px; border-radius: 8px; }
+  .resultado.sucesso { background: var(--ok-dim); border: 1px solid rgba(47,191,113,0.3); }
+  .resultado.erro { background: var(--err-dim); border: 1px solid rgba(255,93,108,0.3); color: var(--err); }
+  .resultado .chave { font-family: monospace; font-size: 11.5px; word-break: break-all; color: var(--muted); margin-top: 6px; }
+  #loginCard { max-width: 380px; margin: 80px auto; }
+  [hidden] { display: none !important; }
+  a { color: var(--accent); }
+  .link-btn { background: none; border: none; color: var(--accent); font-size: 12px; padding: 0; text-decoration: underline; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧾 Emissão de NF-e</h1>
+  <div class="empresa"><a href="/console.html" style="margin-right:14px">console de testes</a><span id="empresaInfo"></span></div>
+</header>
+
+<main>
+
+<div id="loginCard" class="card">
+  <h2>Entrar</h2>
+  <p class="hint">Use uma conta já registrada no console de testes, ou crie uma nova aqui.</p>
+  <label>Nome da empresa</label><input id="loginNome" value="Minha Empresa">
+  <label>Email</label><input id="loginEmail" value="">
+  <label>CNPJ (14 dígitos)</label><input id="loginCnpj" value="">
+  <label>Senha</label><input id="loginSenha" value="senha123456">
+  <div class="row" style="margin-top:12px">
+    <button onclick="registrar()">Criar conta</button>
+    <button class="secondary" onclick="login()">Entrar</button>
+  </div>
+  <div id="loginErro" class="resultado erro" hidden></div>
+</div>
+
+<div id="app" hidden>
+
+  <div class="card" id="empresaCard">
+    <h2>Sua empresa <span id="empresaBadge" class="pill warn">configurar</span></h2>
+    <p class="hint">A UF decide se a venda é interna ou interestadual; o regime decide CST (normal) ou CSOSN (Simples Nacional). Sem isso, o CFOP ainda é sugerido, mas sem a alíquota certa.</p>
+    <div class="row">
+      <div><label>UF da empresa</label><input id="empresaUf" maxlength="2" placeholder="SP" style="text-transform:uppercase"></div>
+      <div>
+        <label>Regime tributário</label>
+        <select id="empresaRegime">
+          <option value="">— selecione —</option>
+          <option value="simples_nacional">Simples Nacional</option>
+          <option value="lucro_presumido">Lucro Presumido</option>
+          <option value="lucro_real">Lucro Real</option>
+        </select>
+      </div>
+    </div>
+    <button onclick="salvarEmpresa()" style="margin-top:12px">Salvar</button>
+  </div>
+
+  <div class="card">
+    <h2>1. Destinatário</h2>
+    <div class="search-wrap">
+      <input id="buscaDestinatario" placeholder="Buscar cliente por nome ou CPF/CNPJ..." oninput="buscarDestinatarios()">
+      <div id="dropdownDestinatario" class="dropdown" hidden></div>
+    </div>
+    <button class="link-btn" style="margin-top:8px" onclick="toggleNovoCliente()">+ cadastrar novo cliente</button>
+
+    <div id="novoClienteForm" hidden style="margin-top:10px">
+      <div class="row">
+        <div><label>Nome</label><input id="novoClienteNome"></div>
+        <div><label>CPF/CNPJ</label><input id="novoClienteDoc"></div>
+      </div>
+      <div class="row">
+        <div><label>UF</label><input id="novoClienteUf" maxlength="2" style="text-transform:uppercase"></div>
+        <div><label>Cidade</label><input id="novoClienteCidade"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;flex-direction:row;margin-top:10px">
+        <input type="checkbox" id="novoClienteContribuinte" style="width:auto">
+        <span style="font-size:12.5px;color:var(--text)">Contribuinte de ICMS (tem inscrição estadual)</span>
+      </label>
+      <button class="secondary" style="margin-top:10px" onclick="salvarNovoCliente()">Salvar cliente</button>
+    </div>
+
+    <div id="destinatarioSelecionado" hidden class="chip">
+      <div>
+        <div class="name" id="destNome"></div>
+        <div class="meta" id="destMeta"></div>
+      </div>
+      <button class="small secondary" onclick="limparDestinatario()">Trocar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Itens</h2>
+    <div class="search-wrap">
+      <input id="buscaProduto" placeholder="Buscar produto por código ou descrição..." oninput="buscarProdutos()">
+      <div id="dropdownProduto" class="dropdown" hidden></div>
+    </div>
+
+    <table id="tabelaItens">
+      <thead>
+        <tr>
+          <th>Produto</th>
+          <th>CFOP</th>
+          <th>Qtd</th>
+          <th>Vl. unit.</th>
+          <th>Subtotal</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="corpoItens"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>3. Revisão e emissão</h2>
+    <label>Natureza da operação</label>
+    <input id="naturezaOperacao" value="Venda de mercadoria">
+    <label style="display:flex;align-items:center;gap:6px;flex-direction:row;margin-top:10px">
+      <input type="checkbox" id="baixarEstoque" checked style="width:auto">
+      <span style="font-size:12.5px;color:var(--text)">Baixar estoque automaticamente ao emitir</span>
+    </label>
+
+    <div class="totais">
+      <div class="item"><div class="v" id="totalItens">0</div><div class="k">itens</div></div>
+      <div class="item"><div class="v" id="totalGeral">R$ 0,00</div><div class="k">total da nota</div></div>
+    </div>
+
+    <button onclick="emitirNFe()" style="margin-top:14px" id="btnEmitir">Emitir NF-e</button>
+    <div id="resultadoEmissao"></div>
+  </div>
+
+  <div class="card">
+    <h2>NF-es emitidas <button class="small secondary" onclick="carregarNFes()" style="margin-left:8px">Atualizar</button></h2>
+    <table>
+      <thead><tr><th>Nº</th><th>Cliente</th><th>Valor</th><th>Status</th><th>Emitida em</th><th></th></tr></thead>
+      <tbody id="corpoNFes"></tbody>
+    </table>
+  </div>
+
+</div>
+
+</main>
+
+<script>
+const baseUrl = '/api';
+let token = null;
+let empresa = null;
+let destinatarioSelecionado = null;
+let itens = [];
+
+document.getElementById('loginEmail').value = 'empresa' + Date.now() + '@exemplo.com';
+document.getElementById('loginCnpj').value = String(Date.now()).slice(-14).padStart(14, '1');
+
+async function api(method, path, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch(baseUrl + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+async function registrar() {
+  const r = await api('POST', '/auth/registrar', {
+    nome: document.getElementById('loginNome').value,
+    email: document.getElementById('loginEmail').value,
+    cnpj: document.getElementById('loginCnpj').value,
+    senha: document.getElementById('loginSenha').value,
+    razaoSocial: document.getElementById('loginNome').value
+  });
+  if (r.ok) { onLogin(r.data); } else { mostrarErroLogin(r.data.error || JSON.stringify(r.data)); }
+}
+
+async function login() {
+  const r = await api('POST', '/auth/login', {
+    email: document.getElementById('loginEmail').value,
+    senha: document.getElementById('loginSenha').value
+  });
+  if (r.ok) { onLogin(r.data); } else { mostrarErroLogin(r.data.error || JSON.stringify(r.data)); }
+}
+
+function mostrarErroLogin(msg) {
+  const el = document.getElementById('loginErro');
+  el.hidden = false;
+  el.textContent = msg;
+}
+
+async function onLogin(data) {
+  token = data.token;
+  document.getElementById('loginCard').hidden = true;
+  document.getElementById('app').hidden = false;
+  await carregarPerfil();
+  await carregarNFes();
+}
+
+async function carregarPerfil() {
+  const r = await api('GET', '/usuarios/perfil');
+  if (!r.ok) return;
+  empresa = r.data;
+  document.getElementById('empresaInfo').textContent = `${empresa.nome} — CNPJ ${empresa.cnpj}`;
+  document.getElementById('empresaUf').value = empresa.uf || '';
+  document.getElementById('empresaRegime').value = empresa.regimeTributario || '';
+  atualizarBadgeEmpresa();
+}
+
+function atualizarBadgeEmpresa() {
+  const badge = document.getElementById('empresaBadge');
+  if (empresa.uf && empresa.regimeTributario) {
+    badge.textContent = 'configurado';
+    badge.className = 'pill ok';
+  } else {
+    badge.textContent = 'incompleto';
+    badge.className = 'pill warn';
+  }
+}
+
+async function salvarEmpresa() {
+  const uf = document.getElementById('empresaUf').value.toUpperCase();
+  const regimeTributario = document.getElementById('empresaRegime').value || null;
+  const r = await api('PUT', '/usuarios/perfil', { uf, regimeTributario });
+  if (r.ok) { empresa = r.data.usuario; atualizarBadgeEmpresa(); }
+}
+
+// ---------- Destinatário ----------
+
+let buscaDestTimeout;
+function buscarDestinatarios() {
+  clearTimeout(buscaDestTimeout);
+  const termo = document.getElementById('buscaDestinatario').value.trim();
+  const dropdown = document.getElementById('dropdownDestinatario');
+  if (!termo) { dropdown.hidden = true; return; }
+  buscaDestTimeout = setTimeout(async () => {
+    const r = await api('GET', '/destinatarios?busca=' + encodeURIComponent(termo));
+    if (!r.ok) return;
+    if (r.data.destinatarios.length === 0) {
+      dropdown.innerHTML = '<div class="dropdown-item"><span class="sub">Nenhum cliente encontrado — cadastre um novo abaixo</span></div>';
+    } else {
+      dropdown.innerHTML = r.data.destinatarios.map(d => `
+        <div class="dropdown-item" onclick='selecionarDestinatario(${JSON.stringify(d).replace(/'/g, "&apos;")})'>
+          <div>${d.nome}</div>
+          <div class="sub">${d.cpfCnpj} — ${d.uf}</div>
+        </div>`).join('');
+    }
+    dropdown.hidden = false;
+  }, 250);
+}
+
+function selecionarDestinatario(d) {
+  destinatarioSelecionado = d;
+  document.getElementById('dropdownDestinatario').hidden = true;
+  document.getElementById('buscaDestinatario').value = '';
+  document.getElementById('destNome').textContent = d.nome;
+  document.getElementById('destMeta').textContent = `${d.cpfCnpj} — ${d.uf}${d.contribuinteIcms ? ' — contribuinte ICMS' : ''}`;
+  document.getElementById('destinatarioSelecionado').hidden = false;
+  recalcularCfopDosItens();
+}
+
+function limparDestinatario() {
+  destinatarioSelecionado = null;
+  document.getElementById('destinatarioSelecionado').hidden = true;
+}
+
+function toggleNovoCliente() {
+  const form = document.getElementById('novoClienteForm');
+  form.hidden = !form.hidden;
+}
+
+async function salvarNovoCliente() {
+  const body = {
+    nome: document.getElementById('novoClienteNome').value,
+    cpfCnpj: document.getElementById('novoClienteDoc').value,
+    uf: document.getElementById('novoClienteUf').value.toUpperCase(),
+    cidade: document.getElementById('novoClienteCidade').value,
+    contribuinteIcms: document.getElementById('novoClienteContribuinte').checked
+  };
+  const r = await api('POST', '/destinatarios', body);
+  if (r.ok) {
+    selecionarDestinatario(r.data.destinatario);
+    document.getElementById('novoClienteForm').hidden = true;
+  } else {
+    alert(r.data.error || 'Erro ao salvar cliente');
+  }
+}
+
+// ---------- Itens ----------
+
+let buscaProdTimeout;
+function buscarProdutos() {
+  clearTimeout(buscaProdTimeout);
+  const termo = document.getElementById('buscaProduto').value.trim();
+  const dropdown = document.getElementById('dropdownProduto');
+  if (!termo) { dropdown.hidden = true; return; }
+  buscaProdTimeout = setTimeout(async () => {
+    const r = await api('GET', '/estoque/produtos?busca=' + encodeURIComponent(termo));
+    if (!r.ok) return;
+    if (r.data.produtos.length === 0) {
+      dropdown.innerHTML = '<div class="dropdown-item"><span class="sub">Nenhum produto encontrado</span></div>';
+    } else {
+      dropdown.innerHTML = r.data.produtos.map(p => `
+        <div class="dropdown-item" onclick='adicionarItem(${JSON.stringify(p).replace(/'/g, "&apos;")})'>
+          <div>${p.codigo} — ${p.descricao}</div>
+          <div class="sub">Saldo: ${Number(p.quantidade).toFixed(0)} · R$ ${Number(p.precoVenda).toFixed(2)}</div>
+        </div>`).join('');
+    }
+    dropdown.hidden = false;
+  }, 250);
+}
+
+async function adicionarItem(produto) {
+  document.getElementById('dropdownProduto').hidden = true;
+  document.getElementById('buscaProduto').value = '';
+
+  const item = {
+    produto,
+    quantidade: 1,
+    valorUnitario: Number(produto.precoVenda) || 0,
+    cfop: '',
+    cfopDescricao: '',
+    avisos: []
+  };
+  itens.push(item);
+  renderizarItens();
+  await atualizarSugestaoItem(item);
+  renderizarItens();
+}
+
+function removerItem(idx) {
+  itens.splice(idx, 1);
+  renderizarItens();
+}
+
+async function atualizarSugestaoItem(item) {
+  if (!destinatarioSelecionado || !empresa?.uf) {
+    item.cfop = '';
+    item.cfopDescricao = 'selecione o destinatário e configure a UF da empresa';
+    return;
+  }
+  const r = await api('POST', '/fiscal/classificacao/sugerir', {
+    produtoId: item.produto.id,
+    tipoOperacao: 'venda',
+    ufOrigem: empresa.uf,
+    ufDestino: destinatarioSelecionado.uf
+  });
+  if (r.ok) {
+    item.cfop = r.data.cfop;
+    item.cfopDescricao = r.data.cfopDescricao;
+    item.tabelaIcms = r.data.tabelaIcms;
+    item.codigoIcms = r.data.codigoIcms;
+    item.avisos = r.data.avisos || [];
+  } else {
+    item.cfop = '';
+    item.avisos = [r.data.error];
+  }
+}
+
+async function recalcularCfopDosItens() {
+  for (const item of itens) await atualizarSugestaoItem(item);
+  renderizarItens();
+}
+
+function renderizarItens() {
+  const corpo = document.getElementById('corpoItens');
+  corpo.innerHTML = itens.map((item, idx) => `
+    <tr>
+      <td>${item.produto.codigo}<br><span style="color:var(--muted);font-size:11px">${item.produto.descricao}</span></td>
+      <td><input value="${item.cfop}" title="${item.cfopDescricao || ''}" onchange="itens[${idx}].cfop=this.value"></td>
+      <td><input type="number" min="0.001" step="0.001" value="${item.quantidade}" style="width:70px" onchange="itens[${idx}].quantidade=Number(this.value);renderizarItens()"></td>
+      <td><input type="number" min="0" step="0.01" value="${item.valorUnitario}" style="width:80px" onchange="itens[${idx}].valorUnitario=Number(this.value);renderizarItens()"></td>
+      <td>R$ ${(item.quantidade * item.valorUnitario).toFixed(2)}</td>
+      <td><button class="small danger" onclick="removerItem(${idx})">×</button></td>
+    </tr>
+  `).join('');
+
+  const avisos = [...new Set(itens.flatMap(i => i.avisos || []))];
+  const existente = document.getElementById('avisosItens');
+  if (existente) existente.remove();
+  if (avisos.length) {
+    const div = document.createElement('div');
+    div.id = 'avisosItens';
+    div.className = 'avisos';
+    div.innerHTML = '<ul>' + avisos.map(a => `<li>${a}</li>`).join('') + '</ul>';
+    document.getElementById('tabelaItens').after(div);
+  }
+
+  document.getElementById('totalItens').textContent = itens.length;
+  const total = itens.reduce((s, i) => s + i.quantidade * i.valorUnitario, 0);
+  document.getElementById('totalGeral').textContent = 'R$ ' + total.toFixed(2);
+}
+
+// ---------- Emissão ----------
+
+async function emitirNFe() {
+  const resultadoEl = document.getElementById('resultadoEmissao');
+  resultadoEl.innerHTML = '';
+
+  if (!destinatarioSelecionado) return alert('Selecione ou cadastre um destinatário');
+  if (itens.length === 0) return alert('Adicione ao menos um item');
+
+  const btn = document.getElementById('btnEmitir');
+  btn.disabled = true;
+  btn.textContent = 'Emitindo...';
+
+  const body = {
+    destinatarioId: destinatarioSelecionado.id,
+    naturezaOperacao: document.getElementById('naturezaOperacao').value,
+    baixarEstoque: document.getElementById('baixarEstoque').checked,
+    itens: itens.map(i => ({
+      produtoId: i.produto.id,
+      quantidade: i.quantidade,
+      valorUnitario: i.valorUnitario,
+      cfop: i.cfop || undefined,
+      tabelaIcms: i.tabelaIcms,
+      codigoIcms: i.codigoIcms
+    }))
+  };
+
+  const r = await api('POST', '/nfe/emitir', body);
+  btn.disabled = false;
+  btn.textContent = 'Emitir NF-e';
+
+  if (r.ok) {
+    resultadoEl.innerHTML = `
+      <div class="resultado sucesso">
+        <strong>✅ NF-e nº ${r.data.nfe.numero} emitida com sucesso</strong> — total R$ ${r.data.nfe.valor}
+        <div class="chave">Chave: ${r.data.nfe.chaveNFe}</div>
+        ${r.data.avisos?.length ? '<div class="avisos" style="margin-top:8px"><ul>' + r.data.avisos.map(a => `<li>${a}</li>`).join('') + '</ul></div>' : ''}
+      </div>`;
+    itens = [];
+    limparDestinatario();
+    renderizarItens();
+    carregarNFes();
+  } else {
+    resultadoEl.innerHTML = `<div class="resultado erro">❌ ${r.data.error}</div>`;
+  }
+}
+
+async function carregarNFes() {
+  const r = await api('GET', '/nfe?limite=10');
+  if (!r.ok) return;
+  document.getElementById('corpoNFes').innerHTML = r.data.nfes.map(nfe => `
+    <tr>
+      <td>${nfe.numero}/${nfe.serie}</td>
+      <td>${nfe.nomeCliente || '—'}</td>
+      <td>R$ ${Number(nfe.valor || 0).toFixed(2)}</td>
+      <td><span class="pill">${nfe.statusSEFAZ}</span></td>
+      <td>${new Date(nfe.dataEmissao).toLocaleString('pt-BR')}</td>
+      <td><button class="link-btn" onclick="verXml('${nfe.id}')">ver XML</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" style="color:var(--muted)">Nenhuma NF-e emitida ainda</td></tr>';
+}
+
+async function verXml(nfeId) {
+  const r = await api('GET', '/nfe/' + nfeId + '/xml');
+  if (!r.ok) return alert(r.data.error || 'Erro ao obter XML');
+  const janela = window.open('', '_blank');
+  janela.document.write('<pre style="white-space:pre-wrap;font-family:monospace;padding:16px">' + r.data.xml.replace(/</g, '&lt;') + '</pre>');
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-wrap')) {
+    document.getElementById('dropdownDestinatario').hidden = true;
+    document.getElementById('dropdownProduto').hidden = true;
+  }
+});
+</script>
+
+</body>
+</html>

@@ -34,7 +34,7 @@ router.get('/perfil', async (req, res) => {
  */
 router.put('/perfil', async (req, res) => {
   try {
-    const { nome, razaoSocial, regimeTributario } = req.body;
+    const { nome, razaoSocial, regimeTributario, uf } = req.body;
     const usuario = await Usuario.findByPk(req.usuario.id);
 
     if (!usuario) {
@@ -51,6 +51,7 @@ router.put('/perfil', async (req, res) => {
 
     if (nome) usuario.nome = nome;
     if (razaoSocial) usuario.razaoSocial = razaoSocial;
+    if (uf) usuario.uf = String(uf).toUpperCase();
 
     await usuario.save();
 

@@ -1,0 +1,81 @@
+### Configuração base
+@baseUrl = http://localhost:5000/api
+@token = seu_token_jwt_aqui
+@destinatarioId = uuid_do_cliente_aqui
+@produtoId = uuid_do_produto_aqui
+
+### ========================
+### CONFIGURAÇÃO DA EMPRESA (uma vez só)
+### ========================
+
+### 1. Configurar UF e regime tributário
+PUT {{baseUrl}}/usuarios/perfil
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "uf": "SP",
+  "regimeTributario": "simples_nacional"
+}
+
+### ========================
+### DESTINATÁRIOS (clientes)
+### ========================
+
+### 2. Cadastrar cliente
+POST {{baseUrl}}/destinatarios
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "nome": "Cliente Final",
+  "cpfCnpj": "12345678909",
+  "uf": "RJ",
+  "cidade": "Rio de Janeiro",
+  "contribuinteIcms": false
+}
+
+### 3. Buscar clientes
+GET {{baseUrl}}/destinatarios?busca=cliente
+Authorization: Bearer {{token}}
+
+### ========================
+### EMISSÃO (ver EMISSAO.md)
+### ========================
+
+### 4. Emitir NF-e com destinatário já cadastrado
+POST {{baseUrl}}/nfe/emitir
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "destinatarioId": "{{destinatarioId}}",
+  "itens": [
+    { "produtoId": "{{produtoId}}", "quantidade": 3 }
+  ]
+}
+
+### 5. Emitir NF-e com cadastro rápido de cliente embutido
+POST {{baseUrl}}/nfe/emitir
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "destinatario": { "nome": "Cliente Novo", "cpfCnpj": "98765432000199", "uf": "MG" },
+  "itens": [
+    { "produtoId": "{{produtoId}}", "quantidade": 1, "valorUnitario": 199.90 }
+  ],
+  "naturezaOperacao": "Venda de mercadoria",
+  "baixarEstoque": true
+}
+
+### 6. Emitir sem baixar estoque (ex: nota sem controle de produto físico)
+POST {{baseUrl}}/nfe/emitir
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "destinatarioId": "{{destinatarioId}}",
+  "itens": [{ "produtoId": "{{produtoId}}", "quantidade": 1 }],
+  "baixarEstoque": false
+}

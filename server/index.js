@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth');
 const usuarioRoutes = require('./routes/usuario');
 const estoqueRoutes = require('./routes/estoque');
 const fiscalRoutes = require('./routes/fiscal');
+const destinatarioRoutes = require('./routes/destinatario');
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/nfe', nfeRoutes);
 app.use('/api/estoque', estoqueRoutes);
 app.use('/api/fiscal', fiscalRoutes);
+app.use('/api/destinatarios', destinatarioRoutes);
 
 // Rota de health check
 app.get('/api/health', (req, res) => {
