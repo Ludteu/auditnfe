@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   cnpj VARCHAR(14) UNIQUE NOT NULL,
   senha VARCHAR NOT NULL,
   razaoSocial VARCHAR,
+  regimeTributario VARCHAR(20),
   ativo BOOLEAN DEFAULT true,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -18,6 +19,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
 CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email);
 CREATE INDEX IF NOT EXISTS idx_usuarios_cnpj ON usuarios(cnpj);
 CREATE INDEX IF NOT EXISTS idx_usuarios_ativo ON usuarios(ativo);
+
+ALTER TABLE usuarios ADD CONSTRAINT chk_regime_tributario
+  CHECK (regimeTributario IS NULL OR regimeTributario IN ('simples_nacional', 'lucro_presumido', 'lucro_real'));
 
 -- Tabela de certificados
 CREATE TABLE IF NOT EXISTS certificados (
@@ -79,6 +83,7 @@ CREATE TABLE IF NOT EXISTS produtos (
   codigo VARCHAR NOT NULL,
   descricao VARCHAR NOT NULL,
   unidade VARCHAR(6) DEFAULT 'UN',
+  finalidade VARCHAR(25) NOT NULL DEFAULT 'revenda',
   quantidade DECIMAL(15, 3) NOT NULL DEFAULT 0,
   estoqueMinimo DECIMAL(15, 3) NOT NULL DEFAULT 0,
   precoCusto DECIMAL(15, 4) DEFAULT 0,
@@ -100,6 +105,9 @@ CREATE TABLE IF NOT EXISTS produtos (
 CREATE INDEX IF NOT EXISTS idx_produtos_usuario_codigo ON produtos(usuarioId, codigo);
 CREATE INDEX IF NOT EXISTS idx_produtos_quantidade ON produtos(quantidade);
 CREATE INDEX IF NOT EXISTS idx_produtos_ncm ON produtos(ncm);
+
+ALTER TABLE produtos ADD CONSTRAINT chk_finalidade_produto
+  CHECK (finalidade IN ('revenda', 'producao_propria', 'materia_prima_insumo', 'uso_consumo', 'ativo_imobilizado'));
 
 -- Tabela de movimentações de estoque
 CREATE TABLE IF NOT EXISTS movimentacoes_estoque (

@@ -7,6 +7,11 @@ const router = express.Router();
 router.use(autenticacao);
 
 /**
+ * Classificação fiscal (CFOP/CST/CSOSN sugeridos)
+ */
+router.post('/classificacao/sugerir', tributacaoController.sugerirClassificacao);
+
+/**
  * Tributação
  */
 router.post('/tributacao/extrair', tributacaoController.extrair);

@@ -34,11 +34,19 @@ router.get('/perfil', async (req, res) => {
  */
 router.put('/perfil', async (req, res) => {
   try {
-    const { nome, razaoSocial } = req.body;
+    const { nome, razaoSocial, regimeTributario } = req.body;
     const usuario = await Usuario.findByPk(req.usuario.id);
 
     if (!usuario) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    const regimesValidos = ['simples_nacional', 'lucro_presumido', 'lucro_real'];
+    if (regimeTributario !== undefined) {
+      if (regimeTributario !== null && !regimesValidos.includes(regimeTributario)) {
+        return res.status(400).json({ error: `regimeTributario deve ser um de: ${regimesValidos.join(', ')}` });
+      }
+      usuario.regimeTributario = regimeTributario;
     }
 
     if (nome) usuario.nome = nome;

@@ -1,6 +1,9 @@
 const NFe = require('../models/NFe');
+const Produto = require('../models/Produto');
+const Usuario = require('../models/Usuario');
 const tributacaoService = require('../services/tributacaoService');
 const spedService = require('../services/spedService');
+const fiscalRulesService = require('../services/fiscalRulesService');
 
 /**
  * Extrai tributação de um XML enviado diretamente ou de uma NF-e já cadastrada
@@ -113,11 +116,46 @@ const downloadEfd = async (req, res) => {
   }
 };
 
+/**
+ * Sugere CFOP + CST/CSOSN para uma operação, a partir da finalidade do
+ * item (do produto cadastrado ou informada diretamente) e do regime
+ * tributário da empresa autenticada.
+ */
+const sugerirClassificacao = async (req, res) => {
+  try {
+    const { produtoId, tipoOperacao, ufOrigem, ufDestino } = req.body;
+    let { finalidade } = req.body;
+
+    if (produtoId) {
+      const produto = await Produto.findOne({ where: { id: produtoId, usuarioId: req.usuario.id } });
+      if (!produto) {
+        return res.status(404).json({ error: 'Produto não encontrado' });
+      }
+      finalidade = finalidade || produto.finalidade;
+    }
+
+    const usuario = await Usuario.findByPk(req.usuario.id);
+
+    const resultado = fiscalRulesService.sugerirClassificacaoFiscal({
+      finalidade,
+      tipoOperacao,
+      ufOrigem,
+      ufDestino,
+      regimeTributario: usuario?.regimeTributario
+    });
+
+    res.json(resultado);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 module.exports = {
   extrair,
   preencherProduto,
   atualizarTributacao,
   resumo,
   gerarEfd,
-  downloadEfd
+  downloadEfd,
+  sugerirClassificacao
 };

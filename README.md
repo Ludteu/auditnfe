@@ -14,6 +14,7 @@ Veja [RUN.md](RUN.md) para o guia rápido de execução (Docker, Linux/Mac, Wind
 - ✅ Autenticação com JWT
 - ✅ Gerenciamento de certificados digitais
 - ✅ Controle de estoque com preço médio ponderado e alertas de estoque mínimo
+- ✅ Sugestão automática de CFOP/CST/CSOSN a partir da finalidade do item e do regime tributário da empresa (ver [CLASSIFICACAO_FISCAL.md](CLASSIFICACAO_FISCAL.md))
 - ✅ Extração automática de tributação (NCM, CFOP, ICMS, IPI) a partir do XML da NF-e
 - ✅ Geração de arquivo EFD-ICMS/IPI simplificado (ver aviso em [TRIBUTACAO_EFD.md](TRIBUTACAO_EFD.md))
 - ✅ API RESTful completa
@@ -269,11 +270,12 @@ GET    /api/estoque/historico         # Histórico de movimentações
 GET    /api/estoque/relatorio         # Resumo consolidado de estoque
 ```
 
-### Tributação e SPED
+### Classificação fiscal, tributação e SPED
 
-Detalhes e exemplos completos em [TRIBUTACAO_EFD.md](TRIBUTACAO_EFD.md) e [TRIBUTACAO_REQUISICOES.http](TRIBUTACAO_REQUISICOES.http).
+Detalhes e exemplos completos em [CLASSIFICACAO_FISCAL.md](CLASSIFICACAO_FISCAL.md), [TRIBUTACAO_EFD.md](TRIBUTACAO_EFD.md) e [TRIBUTACAO_REQUISICOES.http](TRIBUTACAO_REQUISICOES.http).
 
 ```http
+POST /api/fiscal/classificacao/sugerir # Sugere CFOP/CST/CSOSN a partir da finalidade do item
 POST /api/fiscal/tributacao/extrair    # Extrai NCM/CFOP/ICMS/IPI de um XML ou NF-e cadastrada
 POST /api/fiscal/tributacao/produtos   # Aplica dados extraídos a um produto
 PUT  /api/fiscal/tributacao/:id        # Atualiza tributação de um produto manualmente
@@ -342,6 +344,7 @@ curl -X GET "http://localhost:5000/api/nfe/buscar?chaveNFe=352306417766600016555
 - cnpj (VARCHAR, unique)
 - senha (VARCHAR)
 - razaoSocial (VARCHAR)
+- regimeTributario (ENUM: simples_nacional, lucro_presumido, lucro_real, opcional)
 - ativo (BOOLEAN)
 - createdAt / updatedAt
 ```
@@ -385,6 +388,7 @@ curl -X GET "http://localhost:5000/api/nfe/buscar?chaveNFe=352306417766600016555
 - codigo (VARCHAR) -- único por usuário
 - descricao (VARCHAR)
 - unidade (VARCHAR)
+- finalidade (ENUM: revenda, producao_propria, materia_prima_insumo, uso_consumo, ativo_imobilizado)
 - quantidade (DECIMAL) -- saldo atual
 - estoqueMinimo (DECIMAL)
 - precoCusto / precoMedioCusto / precoVenda (DECIMAL)

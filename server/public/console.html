@@ -53,7 +53,7 @@
   .badge.on { background: rgba(47,191,113,0.15); color: var(--ok); }
   .badge.off { background: rgba(255,93,108,0.15); color: var(--err); }
   label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
-  input {
+  input, select {
     width: 100%;
     padding: 7px 9px;
     border-radius: 6px;
@@ -131,6 +131,14 @@
     <h2>2. Estoque — Produto</h2>
     <label>Código</label><input id="prodCodigo" value="SKU-001">
     <label>Descrição</label><input id="prodDesc" value="Parafuso M6">
+    <label>Finalidade</label>
+    <select id="prodFinalidade">
+      <option value="revenda">Revenda</option>
+      <option value="producao_propria">Produção própria</option>
+      <option value="materia_prima_insumo">Matéria-prima / insumo</option>
+      <option value="uso_consumo">Uso e consumo</option>
+      <option value="ativo_imobilizado">Ativo imobilizado</option>
+    </select>
     <div class="row">
       <div><label>Qtd inicial</label><input id="prodQtd" value="100"></div>
       <div><label>Estoque mínimo</label><input id="prodMin" value="20"></div>
@@ -160,14 +168,43 @@
   </div>
 
   <div class="card">
-    <h2>4. NF-e + Tributação</h2>
+    <h2>4. Classificação Fiscal (CFOP/CST/CSOSN)</h2>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 8px">Sugere CFOP + CST/CSOSN a partir da finalidade do produto (cadastrado no passo 2) e do regime tributário da empresa. Ver <code>CLASSIFICACAO_FISCAL.md</code> na raiz do projeto.</p>
+    <label>Regime tributário da empresa</label>
+    <select id="regimeTributario">
+      <option value="simples_nacional">Simples Nacional</option>
+      <option value="lucro_presumido">Lucro Presumido</option>
+      <option value="lucro_real">Lucro Real</option>
+    </select>
+    <button class="secondary" onclick="configurarRegime()">Salvar regime no perfil</button>
+    <div class="row">
+      <div>
+        <label>Tipo de operação</label>
+        <select id="tipoOperacao">
+          <option value="venda">Venda (saída)</option>
+          <option value="compra">Compra (entrada)</option>
+          <option value="devolucaoDeVenda">Devolução de venda (entrada)</option>
+          <option value="devolucaoDeCompra">Devolução de compra (saída)</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div><label>UF origem</label><input id="ufOrigem" value="SP"></div>
+      <div><label>UF destino</label><input id="ufDestino" value="RJ"></div>
+    </div>
+    <button onclick="sugerirClassificacao()">Sugerir CFOP/CST/CSOSN</button>
+    <pre id="outClassificacao">—</pre>
+  </div>
+
+  <div class="card">
+    <h2>5. NF-e + Tributação</h2>
     <p style="font-size:12px;color:var(--muted);margin:0 0 8px">Cria uma NF-e com um XML de amostra (1 item: Parafuso M6, ICMS 18%, IPI 5%) e extrai a tributação automaticamente.</p>
     <button onclick="criarNfeEExtrair()">Criar NF-e e extrair tributação</button>
     <pre id="outNfe">—</pre>
   </div>
 
   <div class="card">
-    <h2>5. Resumo Fiscal e EFD</h2>
+    <h2>6. Resumo Fiscal e EFD</h2>
     <div class="row">
       <div><label>Data início</label><input id="dtIni" value="2026-01-01"></div>
       <div><label>Data fim</label><input id="dtFim" value="2026-12-31"></div>
@@ -247,6 +284,7 @@ async function criarProduto() {
   const r = await api('POST', '/estoque/produtos', {
     codigo: document.getElementById('prodCodigo').value,
     descricao: document.getElementById('prodDesc').value,
+    finalidade: document.getElementById('prodFinalidade').value,
     quantidade: Number(document.getElementById('prodQtd').value),
     estoqueMinimo: Number(document.getElementById('prodMin').value),
     precoCusto: Number(document.getElementById('prodCusto').value),
@@ -291,6 +329,24 @@ async function atualizarStatsEstoque() {
     <div class="stat"><div class="v">R$ ${s.valorTotalVenda}</div><div class="k">valor de venda</div></div>
     <div class="stat"><div class="v">${s.itensAbaixoMinimo}</div><div class="k">abaixo do mínimo</div></div>
   `;
+}
+
+async function configurarRegime() {
+  const r = await api('PUT', '/usuarios/perfil', {
+    regimeTributario: document.getElementById('regimeTributario').value
+  });
+  show('outClassificacao', r.data);
+}
+
+async function sugerirClassificacao() {
+  if (!produtoId) return show('outClassificacao', 'Cadastre um produto primeiro (passo 2) — a sugestão usa a finalidade dele.');
+  const r = await api('POST', '/fiscal/classificacao/sugerir', {
+    produtoId,
+    tipoOperacao: document.getElementById('tipoOperacao').value,
+    ufOrigem: document.getElementById('ufOrigem').value,
+    ufDestino: document.getElementById('ufDestino').value
+  });
+  show('outClassificacao', r.data);
 }
 
 let nfeId = null;

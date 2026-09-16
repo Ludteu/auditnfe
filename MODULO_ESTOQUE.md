@@ -17,6 +17,7 @@ POST /api/estoque/produtos
   "codigo": "SKU-001",
   "descricao": "Parafuso M6",
   "unidade": "UN",
+  "finalidade": "revenda",
   "quantidade": 100,
   "estoqueMinimo": 20,
   "precoCusto": 0.50,
@@ -24,6 +25,8 @@ POST /api/estoque/produtos
   "ncm": "73181500"
 }
 ```
+
+`finalidade` (`revenda`, `producao_propria`, `materia_prima_insumo`, `uso_consumo` ou `ativo_imobilizado`, padrão `revenda`) diz por que a empresa tem esse item — é a partir dela que o motor de classificação fiscal deriva o CFOP correto na hora de emitir. Veja [CLASSIFICACAO_FISCAL.md](CLASSIFICACAO_FISCAL.md).
 
 ## Registrar entrada
 

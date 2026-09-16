@@ -5,6 +5,43 @@
 @produtoId = uuid_do_produto_aqui
 
 ### ========================
+### CLASSIFICAÇÃO FISCAL AUTOMÁTICA (ver CLASSIFICACAO_FISCAL.md)
+### ========================
+
+### 0a. Configurar regime tributário da empresa (uma vez só)
+PUT {{baseUrl}}/usuarios/perfil
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "regimeTributario": "simples_nacional"
+}
+
+### 0b. Sugerir CFOP/CST/CSOSN a partir de um produto já cadastrado
+POST {{baseUrl}}/fiscal/classificacao/sugerir
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "produtoId": "{{produtoId}}",
+  "tipoOperacao": "venda",
+  "ufOrigem": "SP",
+  "ufDestino": "RJ"
+}
+
+### 0c. Sugerir informando a finalidade diretamente (sem produto cadastrado)
+POST {{baseUrl}}/fiscal/classificacao/sugerir
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "finalidade": "materia_prima_insumo",
+  "tipoOperacao": "compra",
+  "ufOrigem": "SP",
+  "ufDestino": "SP"
+}
+
+### ========================
 ### EXTRAÇÃO DE TRIBUTAÇÃO
 ### ========================
 

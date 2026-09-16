@@ -27,6 +27,11 @@ const Produto = sequelize.define('Produto', {
     type: DataTypes.STRING(6),
     defaultValue: 'UN'
   },
+  finalidade: {
+    type: DataTypes.ENUM('revenda', 'producao_propria', 'materia_prima_insumo', 'uso_consumo', 'ativo_imobilizado'),
+    allowNull: false,
+    defaultValue: 'revenda'
+  },
   quantidade: {
     type: DataTypes.DECIMAL(15, 3),
     allowNull: false,

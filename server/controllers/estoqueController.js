@@ -7,7 +7,7 @@ const estoqueService = require('../services/estoqueService');
 const criarProduto = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
-    const { codigo, descricao, unidade, quantidade, estoqueMinimo, precoCusto, precoVenda, ncm, cfop, icmsAliquota, ipiAliquota } = req.body;
+    const { codigo, descricao, unidade, finalidade, quantidade, estoqueMinimo, precoCusto, precoVenda, ncm, cfop, icmsAliquota, ipiAliquota } = req.body;
 
     if (!codigo || !descricao) {
       return res.status(400).json({ error: 'Código e descrição são obrigatórios' });
@@ -23,6 +23,7 @@ const criarProduto = async (req, res) => {
       codigo,
       descricao,
       unidade,
+      finalidade,
       quantidade: quantidade || 0,
       estoqueMinimo: estoqueMinimo || 0,
       precoCusto: precoCusto || 0,
@@ -102,7 +103,7 @@ const atualizarProduto = async (req, res) => {
       return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
-    const camposPermitidos = ['descricao', 'unidade', 'estoqueMinimo', 'precoCusto', 'precoVenda', 'ncm', 'cfop', 'cstIcms', 'icmsAliquota', 'cstIpi', 'ipiAliquota', 'ativo'];
+    const camposPermitidos = ['descricao', 'unidade', 'finalidade', 'estoqueMinimo', 'precoCusto', 'precoVenda', 'ncm', 'cfop', 'cstIcms', 'icmsAliquota', 'cstIpi', 'ipiAliquota', 'ativo'];
     for (const campo of camposPermitidos) {
       if (req.body[campo] !== undefined) produto[campo] = req.body[campo];
     }
