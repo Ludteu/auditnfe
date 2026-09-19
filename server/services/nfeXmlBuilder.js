@@ -92,7 +92,7 @@ const montarGrupoIpi = (item) => {
 /**
  * Monta o XML completo da NF-e. Retorna { xmlContent, chaveNFe }.
  */
-const montarXmlNFe = ({ emitente, destinatario, itens, numero, serie, naturezaOperacao, dataEmissao }) => {
+const montarXmlNFe = ({ emitente, destinatario, itens, numero, serie, naturezaOperacao, dataEmissao, observacoes }) => {
   const dataFinal = dataEmissao || new Date();
   const chaveNFe = gerarChaveNFe({ ufSigla: emitente.uf, cnpj: emitente.cnpj, numero, serie, dataEmissao: dataFinal });
 
@@ -114,7 +114,18 @@ const montarXmlNFe = ({ emitente, destinatario, itens, numero, serie, naturezaOp
       </imposto>
     </det>`).join('');
 
-  const xmlContent = `<?xml version="1.0" encoding="UTF-8"?><NFe xmlns="http://www.portalfiscal.inf.br/nfe"><infNfe Id="NFe${chaveNFe}" versao="4.00"><ide><cUF>${CODIGO_UF[emitente.uf.toUpperCase()]}</cUF><natOp>${escapeXml(naturezaOperacao || 'Venda de mercadoria')}</natOp><mod>55</mod><serie>${serie}</serie><nNF>${numero}</nNF><dhEmi>${new Date(dataFinal).toISOString()}</dhEmi></ide><emit><CNPJ>${escapeXml(String(emitente.cnpj).replace(/\D/g, ''))}</CNPJ><xNome>${escapeXml(emitente.razaoSocial || emitente.nome)}</xNome><enderEmit><UF>${emitente.uf.toUpperCase()}</UF></enderEmit></emit><dest><CNPJ>${escapeXml(String(destinatario.cpfCnpj).replace(/\D/g, ''))}</CNPJ><xNome>${escapeXml(destinatario.nome)}</xNome><enderDest><UF>${destinatario.uf.toUpperCase()}</UF></enderDest></dest>${detsXml}</infNfe></NFe>`;
+  const enderEmit = [
+    emitente.logradouro ? `<xLgr>${escapeXml(emitente.logradouro)}</xLgr>` : '',
+    emitente.numero ? `<nro>${escapeXml(emitente.numero)}</nro>` : '',
+    emitente.bairro ? `<xBairro>${escapeXml(emitente.bairro)}</xBairro>` : '',
+    emitente.cidade ? `<xMun>${escapeXml(emitente.cidade)}</xMun>` : '',
+    `<UF>${emitente.uf.toUpperCase()}</UF>`,
+    emitente.cep ? `<CEP>${escapeXml(emitente.cep)}</CEP>` : ''
+  ].join('');
+
+  const infAdic = observacoes ? `<infAdic><infCpl>${escapeXml(observacoes)}</infCpl></infAdic>` : '';
+
+  const xmlContent = `<?xml version="1.0" encoding="UTF-8"?><NFe xmlns="http://www.portalfiscal.inf.br/nfe"><infNfe Id="NFe${chaveNFe}" versao="4.00"><ide><cUF>${CODIGO_UF[emitente.uf.toUpperCase()]}</cUF><natOp>${escapeXml(naturezaOperacao || 'Venda de mercadoria')}</natOp><mod>55</mod><serie>${serie}</serie><nNF>${numero}</nNF><dhEmi>${new Date(dataFinal).toISOString()}</dhEmi></ide><emit><CNPJ>${escapeXml(String(emitente.cnpj).replace(/\D/g, ''))}</CNPJ><xNome>${escapeXml(emitente.razaoSocial || emitente.nome)}</xNome><enderEmit>${enderEmit}</enderEmit></emit><dest><CNPJ>${escapeXml(String(destinatario.cpfCnpj).replace(/\D/g, ''))}</CNPJ><xNome>${escapeXml(destinatario.nome)}</xNome><enderDest><UF>${destinatario.uf.toUpperCase()}</UF></enderDest></dest>${detsXml}${infAdic}</infNfe></NFe>`;
 
   return { xmlContent, chaveNFe };
 };

@@ -363,6 +363,7 @@ const emitir = async (req, res) => {
       itens,
       serie = 1,
       naturezaOperacao,
+      observacoes,
       tipoOperacao = 'venda',
       baixarEstoque = true
     } = req.body;
@@ -455,7 +456,7 @@ const emitir = async (req, res) => {
     const dataEmissao = new Date();
 
     const { xmlContent, chaveNFe } = montarXmlNFe({
-      emitente, destinatario, itens: itensProcessados, numero, serie, naturezaOperacao, dataEmissao
+      emitente, destinatario, itens: itensProcessados, numero, serie, naturezaOperacao, dataEmissao, observacoes
     });
 
     const valorTotalNota = Number(itensProcessados.reduce((soma, i) => soma + i.valorTotal, 0).toFixed(2));

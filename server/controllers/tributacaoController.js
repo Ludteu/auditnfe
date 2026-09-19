@@ -7,6 +7,7 @@ const tributacaoService = require('../services/tributacaoService');
 const spedService = require('../services/spedService');
 const fiscalRulesService = require('../services/fiscalRulesService');
 const estoqueService = require('../services/estoqueService');
+const sefazDistribuicaoService = require('../services/sefazDistribuicaoService');
 const { validarXmlBasico } = require('../utils/xmlHelper');
 
 /**
@@ -271,6 +272,32 @@ const importarNotaCompra = async (req, res) => {
   }
 };
 
+/**
+ * Busca novas notas direto no Ambiente Nacional da NF-e (protocolo
+ * Distribuição DFe), usando o certificado ativo da empresa. Exige um
+ * certificado A1 real — sem um, retorna erro claro (ver
+ * sefazDistribuicaoService.js para o porquê).
+ */
+const buscarNaSefaz = async (req, res) => {
+  try {
+    const usuario = await Usuario.findByPk(req.usuario.id);
+    if (!usuario.uf) {
+      return res.status(400).json({ error: 'Configure a UF da empresa em "Minha empresa" antes de buscar na SEFAZ' });
+    }
+
+    const { ultimoNSU } = req.body;
+    const resultado = await sefazDistribuicaoService.buscarNovasNotas(req.usuario.id, {
+      cnpj: usuario.cnpj,
+      uf: usuario.uf,
+      ultimoNSU: ultimoNSU || '0'
+    });
+
+    res.json(resultado);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 module.exports = {
   extrair,
   preencherProduto,
@@ -279,5 +306,6 @@ module.exports = {
   gerarEfd,
   downloadEfd,
   sugerirClassificacao,
-  importarNotaCompra
+  importarNotaCompra,
+  buscarNaSefaz
 };

@@ -17,6 +17,12 @@ router.post('/classificacao/sugerir', tributacaoController.sugerirClassificacao)
 router.post('/tributacao/importar-nfe-compra', tributacaoController.importarNotaCompra);
 
 /**
+ * Busca automática de notas direto na SEFAZ (Distribuição DFe) — exige
+ * certificado digital A1 real cadastrado e ativo para o CNPJ da empresa
+ */
+router.post('/distribuicao/buscar', tributacaoController.buscarNaSefaz);
+
+/**
  * Tributação
  */
 router.post('/tributacao/extrair', tributacaoController.extrair);

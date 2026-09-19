@@ -63,9 +63,24 @@
   }
   .sidebar button:hover { background: var(--panel-2); color: var(--text); }
   .sidebar button.active { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
-  .content { flex: 1; padding: 22px 28px; max-width: 980px; }
+  .content { flex: 1; padding: 22px 28px; max-width: 1080px; }
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
+  .doc-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .doc-title { font-size: 19px; font-weight: 700; }
+  .doc-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .emitir-layout { display: flex; gap: 18px; align-items: flex-start; }
+  .emitir-main { flex: 1; min-width: 0; }
+  .emitir-sidebar { width: 260px; flex-shrink: 0; }
+  .resumo-sticky { position: sticky; top: 20px; }
+  @media (max-width: 820px) {
+    .emitir-layout { flex-direction: column; }
+    .emitir-sidebar { width: 100%; }
+    .resumo-sticky { position: static; }
+  }
   .card {
     background: var(--panel);
     border: 1px solid var(--border);
@@ -189,77 +204,107 @@
 
     <!-- ===================== EMITIR NF-e ===================== -->
     <section class="tab-panel" id="tab-emitir">
-      <div class="card">
-        <h2>1. Destinatário</h2>
-        <div class="search-wrap">
-          <input id="buscaDestinatario" placeholder="Buscar cliente por nome ou CPF/CNPJ..." oninput="buscarDestinatarios()">
-          <div id="dropdownDestinatario" class="dropdown" hidden></div>
+      <div class="doc-header">
+        <div>
+          <div class="doc-title">Nota Fiscal de Produto</div>
+          <div class="doc-sub">Venda de mercadoria — numeração automática ao emitir</div>
         </div>
-        <button class="link-btn" style="margin-top:8px" onclick="toggleNovoCliente()">+ cadastrar novo cliente</button>
+        <span class="pill">rascunho</span>
+      </div>
 
-        <div id="novoClienteForm" hidden style="margin-top:10px">
-          <div class="row">
-            <div><label>Nome</label><input id="novoClienteNome"></div>
-            <div><label>CPF/CNPJ</label><input id="novoClienteDoc"></div>
+      <div class="emitir-layout">
+        <div class="emitir-main">
+          <div class="card">
+            <h2>Cliente</h2>
+            <div class="search-wrap">
+              <input id="buscaDestinatario" placeholder="Buscar cliente por nome ou CPF/CNPJ..." oninput="buscarDestinatarios()">
+              <div id="dropdownDestinatario" class="dropdown" hidden></div>
+            </div>
+            <button class="link-btn" style="margin-top:8px" onclick="toggleNovoCliente()">+ cadastrar novo cliente</button>
+
+            <div id="novoClienteForm" hidden style="margin-top:10px">
+              <label>CPF/CNPJ</label>
+              <div class="row">
+                <input id="novoClienteDoc">
+                <button class="btn secondary" style="flex:0 0 auto" onclick="buscarCnpjCliente('novoClienteDoc','novoClienteNome','novoClienteUf','novoClienteCidade','novoClienteCnpjStatus')">Buscar</button>
+              </div>
+              <div id="novoClienteCnpjStatus"></div>
+              <div class="row">
+                <div><label>Nome</label><input id="novoClienteNome"></div>
+                <div><label>UF</label><input id="novoClienteUf" maxlength="2" style="text-transform:uppercase"></div>
+              </div>
+              <label>Cidade</label><input id="novoClienteCidade">
+              <label style="display:flex;align-items:center;gap:6px;flex-direction:row;margin-top:10px">
+                <input type="checkbox" id="novoClienteContribuinte" style="width:auto">
+                <span style="font-size:12.5px;color:var(--text)">Contribuinte de ICMS (tem inscrição estadual)</span>
+              </label>
+              <button class="btn secondary" style="margin-top:10px" onclick="salvarNovoCliente()">Salvar cliente</button>
+            </div>
+
+            <div id="destinatarioSelecionado" hidden class="chip">
+              <div><div class="name" id="destNome"></div><div class="meta" id="destMeta"></div></div>
+              <button class="btn small secondary" onclick="limparDestinatario()">Trocar</button>
+            </div>
           </div>
-          <div class="row">
-            <div><label>UF</label><input id="novoClienteUf" maxlength="2" style="text-transform:uppercase"></div>
-            <div><label>Cidade</label><input id="novoClienteCidade"></div>
+
+          <div class="card">
+            <h2>Itens</h2>
+            <div class="search-wrap">
+              <input id="buscaProduto" placeholder="Buscar produto por código ou descrição..." oninput="buscarProdutos()">
+              <div id="dropdownProduto" class="dropdown" hidden></div>
+            </div>
+            <table id="tabelaItens">
+              <thead><tr><th>Produto</th><th>CFOP</th><th>Qtd</th><th>Vl. unit.</th><th>Subtotal</th><th></th></tr></thead>
+              <tbody id="corpoItens"></tbody>
+            </table>
           </div>
-          <label style="display:flex;align-items:center;gap:6px;flex-direction:row;margin-top:10px">
-            <input type="checkbox" id="novoClienteContribuinte" style="width:auto">
-            <span style="font-size:12.5px;color:var(--text)">Contribuinte de ICMS (tem inscrição estadual)</span>
-          </label>
-          <button class="btn secondary" style="margin-top:10px" onclick="salvarNovoCliente()">Salvar cliente</button>
+
+          <div class="card">
+            <h2>Informações adicionais</h2>
+            <label>Natureza da operação</label>
+            <input id="naturezaOperacao" value="Venda de mercadoria">
+            <label>Observações (aparece no XML como informação complementar)</label>
+            <textarea id="observacoesNota" rows="3" placeholder="Ex: condições de entrega, referência do pedido..."></textarea>
+            <label style="display:flex;align-items:center;gap:6px;flex-direction:row;margin-top:10px">
+              <input type="checkbox" id="baixarEstoque" checked style="width:auto">
+              <span style="font-size:12.5px;color:var(--text)">Baixar estoque automaticamente ao emitir</span>
+            </label>
+          </div>
+
+          <div class="card">
+            <h2>NF-es emitidas <button class="btn small secondary" onclick="carregarNFes()" style="margin-left:8px">Atualizar</button></h2>
+            <table>
+              <thead><tr><th>Nº</th><th>Cliente</th><th>Valor</th><th>Status</th><th>Emitida em</th><th></th></tr></thead>
+              <tbody id="corpoNFes"></tbody>
+            </table>
+          </div>
         </div>
 
-        <div id="destinatarioSelecionado" hidden class="chip">
-          <div><div class="name" id="destNome"></div><div class="meta" id="destMeta"></div></div>
-          <button class="btn small secondary" onclick="limparDestinatario()">Trocar</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>2. Itens</h2>
-        <div class="search-wrap">
-          <input id="buscaProduto" placeholder="Buscar produto por código ou descrição..." oninput="buscarProdutos()">
-          <div id="dropdownProduto" class="dropdown" hidden></div>
-        </div>
-        <table id="tabelaItens">
-          <thead><tr><th>Produto</th><th>CFOP</th><th>Qtd</th><th>Vl. unit.</th><th>Subtotal</th><th></th></tr></thead>
-          <tbody id="corpoItens"></tbody>
-        </table>
-      </div>
-
-      <div class="card">
-        <h2>3. Revisão e emissão</h2>
-        <label>Natureza da operação</label>
-        <input id="naturezaOperacao" value="Venda de mercadoria">
-        <label style="display:flex;align-items:center;gap:6px;flex-direction:row;margin-top:10px">
-          <input type="checkbox" id="baixarEstoque" checked style="width:auto">
-          <span style="font-size:12.5px;color:var(--text)">Baixar estoque automaticamente ao emitir</span>
-        </label>
-        <div class="totais">
-          <div class="item"><div class="v" id="totalItens">0</div><div class="k">itens</div></div>
-          <div class="item"><div class="v" id="totalGeral">R$ 0,00</div><div class="k">total da nota</div></div>
-        </div>
-        <button class="btn" onclick="emitirNFe()" style="margin-top:14px" id="btnEmitir">Emitir NF-e</button>
-        <div id="resultadoEmissao"></div>
-      </div>
-
-      <div class="card">
-        <h2>NF-es emitidas <button class="btn small secondary" onclick="carregarNFes()" style="margin-left:8px">Atualizar</button></h2>
-        <table>
-          <thead><tr><th>Nº</th><th>Cliente</th><th>Valor</th><th>Status</th><th>Emitida em</th><th></th></tr></thead>
-          <tbody id="corpoNFes"></tbody>
-        </table>
+        <aside class="emitir-sidebar">
+          <div class="card resumo-sticky">
+            <h2>Resumo</h2>
+            <div class="totais" style="flex-direction:column">
+              <div class="item"><div class="v" id="totalItens">0</div><div class="k">itens</div></div>
+              <div class="item"><div class="v" id="totalGeral">R$ 0,00</div><div class="k">total da nota</div></div>
+            </div>
+            <button class="btn" onclick="emitirNFe()" style="margin-top:14px;width:100%" id="btnEmitir">Emitir NF-e</button>
+            <div id="resultadoEmissao"></div>
+          </div>
+        </aside>
       </div>
     </section>
 
     <!-- ===================== BUSCAR NF-e (ENTRADA) ===================== -->
     <section class="tab-panel" id="tab-entrada">
       <div class="card">
-        <h2>📥 Reconhecer NF-e de compra</h2>
+        <h2>🛰️ Buscar automaticamente na SEFAZ</h2>
+        <p class="hint">Busca direto no Ambiente Nacional da NF-e (protocolo "Distribuição DFe" — o mesmo que Arquivei, NFe Vault e softwares parecidos usam), sem precisar que o fornecedor mande o XML. <strong>Exige um certificado digital A1 real</strong>, emitido pela ICP-Brasil para o CNPJ da empresa e cadastrado em <a href="#" onclick="showTab('empresa');return false">Minha empresa</a> — a SEFAZ só libera esse serviço mediante autenticação mútua por certificado válido.</p>
+        <button class="btn secondary" id="btnBuscarSefaz" onclick="buscarNaSefaz()">Buscar novas notas</button>
+        <div id="resultadoSefaz"></div>
+      </div>
+
+      <div class="card">
+        <h2>📥 Reconhecer NF-e de compra (manual)</h2>
         <p class="hint">Envie o XML de uma NF-e recebida de um fornecedor. O sistema lê os itens e cadastra sozinho os produtos que ainda não existem no seu catálogo (com NCM/CFOP/CST já preenchidos a partir do XML) e dá entrada em estoque nos que já existem.</p>
 
         <div class="dropzone" id="dropzoneXml" onclick="document.getElementById('arquivoXml').click()">
@@ -289,14 +334,17 @@
         <h2>👥 Clientes <button class="btn small secondary" onclick="carregarClientes()" style="margin-left:8px">Atualizar</button></h2>
         <button class="link-btn" onclick="toggleNovoClienteTab()">+ cadastrar novo cliente</button>
         <div id="novoClienteTabForm" hidden style="margin-top:10px">
+          <label>CPF/CNPJ</label>
+          <div class="row">
+            <input id="ctDoc">
+            <button class="btn secondary" style="flex:0 0 auto" onclick="buscarCnpjCliente('ctDoc','ctNome','ctUf','ctCidade','ctCnpjStatus')">Buscar</button>
+          </div>
+          <div id="ctCnpjStatus"></div>
           <div class="row">
             <div><label>Nome</label><input id="ctNome"></div>
-            <div><label>CPF/CNPJ</label><input id="ctDoc"></div>
-          </div>
-          <div class="row">
             <div><label>UF</label><input id="ctUf" maxlength="2" style="text-transform:uppercase"></div>
-            <div><label>Cidade</label><input id="ctCidade"></div>
           </div>
+          <label>Cidade</label><input id="ctCidade">
           <button class="btn secondary" style="margin-top:10px" onclick="salvarClienteTab()">Salvar</button>
         </div>
         <table>
@@ -385,6 +433,27 @@
 
         <button class="btn" onclick="salvarEmpresa()" style="margin-top:14px">Salvar</button>
       </div>
+
+      <div class="card">
+        <h2>🔐 Certificado digital</h2>
+        <p class="hint">Necessário para assinar NF-es e para buscar notas direto na SEFAZ. Aceita arquivos .pfx ou .p12 (padrão A1). A senha do certificado não é salva aqui — ela vem da variável de ambiente <code>CERT_PASSWORD</code> no <code>.env</code> do servidor.</p>
+
+        <label>Arquivo do certificado (.pfx / .p12)</label>
+        <input type="file" id="certArquivo" accept=".pfx,.p12">
+        <div class="row">
+          <div><label>CNPJ vinculado</label><input id="certCnpj"></div>
+          <div><label>Válido até</label><input type="date" id="certValidoAte"></div>
+        </div>
+        <label>Descrição</label>
+        <input id="certDescricao" placeholder="Ex: Certificado A1 principal">
+        <button class="btn secondary" style="margin-top:12px" id="btnEnviarCert" onclick="enviarCertificado()">Enviar certificado</button>
+        <div id="resultadoCertificado"></div>
+
+        <table>
+          <thead><tr><th>Descrição</th><th>CNPJ</th><th>Válido até</th><th>Status</th><th></th></tr></thead>
+          <tbody id="corpoCertificados"></tbody>
+        </table>
+      </div>
     </section>
 
   </main>
@@ -408,6 +477,14 @@ async function api(method, path, body) {
   return { ok: res.ok, status: res.status, data };
 }
 
+async function apiUpload(path, formData) {
+  const headers = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch(baseUrl + path, { method: 'POST', headers, body: formData });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
 function sair() {
   token = null; empresa = null;
   document.getElementById('appShell').hidden = true;
@@ -423,6 +500,7 @@ function showTab(name) {
   if (name === 'clientes') carregarClientes();
   if (name === 'produtos') carregarProdutosTab();
   if (name === 'entrada') carregarNotasRecebidas();
+  if (name === 'empresa') carregarCertificados();
 }
 
 async function registrar() {
@@ -476,7 +554,60 @@ async function carregarPerfil() {
   document.getElementById('empNumero').value = empresa.numero || '';
   document.getElementById('empBairro').value = empresa.bairro || '';
   document.getElementById('empTelefone').value = empresa.telefone || '';
+  document.getElementById('certCnpj').value = empresa.cnpj;
   atualizarBadgeEmpresa();
+}
+
+async function enviarCertificado() {
+  const arquivo = document.getElementById('certArquivo').files[0];
+  const resultadoEl = document.getElementById('resultadoCertificado');
+  resultadoEl.innerHTML = '';
+
+  if (!arquivo) return alert('Escolha o arquivo .pfx ou .p12');
+  const validoAte = document.getElementById('certValidoAte').value;
+  if (!validoAte) return alert('Informe a data de validade do certificado');
+
+  const formData = new FormData();
+  formData.append('certificado', arquivo);
+  formData.append('cnpj', document.getElementById('certCnpj').value.replace(/\D/g, ''));
+  formData.append('validoAte', validoAte);
+  formData.append('descricao', document.getElementById('certDescricao').value);
+
+  const btn = document.getElementById('btnEnviarCert');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  const r = await apiUpload('/usuarios/certificados/upload', formData);
+  btn.disabled = false; btn.textContent = 'Enviar certificado';
+
+  if (r.ok) {
+    resultadoEl.innerHTML = `<div class="resultado sucesso">✅ Certificado enviado com sucesso</div>`;
+    document.getElementById('certArquivo').value = '';
+    document.getElementById('certDescricao').value = '';
+    carregarCertificados();
+  } else {
+    resultadoEl.innerHTML = `<div class="resultado erro">❌ ${r.data.error}</div>`;
+  }
+}
+
+async function carregarCertificados() {
+  const r = await api('GET', '/usuarios/certificados');
+  if (!r.ok) return;
+  const hoje = new Date();
+  document.getElementById('corpoCertificados').innerHTML = r.data.map(c => {
+    const vencido = new Date(c.validoAte) < hoje;
+    return `
+      <tr>
+        <td>${c.descricao || '—'}</td>
+        <td>${c.cnpj}</td>
+        <td>${new Date(c.validoAte).toLocaleDateString('pt-BR')} ${vencido ? '<span class="pill err">vencido</span>' : ''}</td>
+        <td><span class="pill ${c.ativo ? 'ok' : ''}">${c.ativo ? 'ativo' : 'inativo'}</span></td>
+        <td>${!c.ativo ? `<button class="link-btn" onclick="ativarCertificado('${c.id}')">ativar</button>` : ''}</td>
+      </tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty">Nenhum certificado cadastrado ainda</td></tr>';
+}
+
+async function ativarCertificado(id) {
+  const r = await api('PUT', '/usuarios/certificados/' + id + '/ativar');
+  if (r.ok) carregarCertificados(); else alert(r.data.error);
 }
 
 function atualizarBadgeEmpresa() {
@@ -569,6 +700,25 @@ function selecionarDestinatario(d) {
 function limparDestinatario() {
   destinatarioSelecionado = null;
   document.getElementById('destinatarioSelecionado').hidden = true;
+}
+
+async function buscarCnpjCliente(idDoc, idNome, idUf, idCidade, idStatus) {
+  const doc = document.getElementById(idDoc).value.replace(/\D/g, '');
+  const statusEl = document.getElementById(idStatus);
+  statusEl.innerHTML = '';
+
+  if (doc.length !== 14) {
+    statusEl.innerHTML = '<div class="avisos">Busca automática só funciona para CNPJ (14 dígitos) — não existe consulta pública de CPF.</div>';
+    return;
+  }
+
+  const r = await api('GET', '/usuarios/consulta-cnpj/' + doc);
+  if (!r.ok) { statusEl.innerHTML = `<div class="resultado erro">❌ ${r.data.error}</div>`; return; }
+
+  document.getElementById(idNome).value = r.data.razaoSocial;
+  document.getElementById(idUf).value = r.data.uf;
+  document.getElementById(idCidade).value = r.data.cidade;
+  statusEl.innerHTML = `<div class="resultado sucesso">✅ ${r.data.razaoSocial} — situação: ${r.data.situacaoCadastral}</div>`;
 }
 
 function toggleNovoCliente() {
@@ -684,6 +834,7 @@ async function emitirNFe() {
   const body = {
     destinatarioId: destinatarioSelecionado.id,
     naturezaOperacao: document.getElementById('naturezaOperacao').value,
+    observacoes: document.getElementById('observacoesNota').value || undefined,
     baixarEstoque: document.getElementById('baixarEstoque').checked,
     itens: itens.map(i => ({
       produtoId: i.produto.id, quantidade: i.quantidade, valorUnitario: i.valorUnitario,
@@ -702,6 +853,7 @@ async function emitirNFe() {
         ${r.data.avisos?.length ? '<div class="avisos" style="margin-top:8px"><ul>' + r.data.avisos.map(a => `<li>${a}</li>`).join('') + '</ul></div>' : ''}
       </div>`;
     itens = []; limparDestinatario(); renderizarItens(); carregarNFes();
+    document.getElementById('observacoesNota').value = '';
   } else {
     resultadoEl.innerHTML = `<div class="resultado erro">❌ ${r.data.error}</div>`;
   }
@@ -739,6 +891,29 @@ function lerArquivoXml(event) {
     document.getElementById('dropzoneXml').textContent = '📄 ' + arquivo.name + ' carregado';
   };
   reader.readAsText(arquivo);
+}
+
+async function buscarNaSefaz() {
+  const resultadoEl = document.getElementById('resultadoSefaz');
+  const btn = document.getElementById('btnBuscarSefaz');
+  btn.disabled = true; btn.textContent = 'Buscando...';
+  resultadoEl.innerHTML = '';
+
+  const r = await api('POST', '/fiscal/distribuicao/buscar', {});
+  btn.disabled = false; btn.textContent = 'Buscar novas notas';
+
+  if (!r.ok) {
+    resultadoEl.innerHTML = `<div class="resultado erro">❌ ${r.data.error}</div>`;
+    return;
+  }
+
+  if (!r.data.documentos || r.data.documentos.length === 0) {
+    resultadoEl.innerHTML = `<div class="resultado sucesso">✅ Consulta feita — nenhum documento novo (${r.data.xMotivo || 'sem novidades'})</div>`;
+    return;
+  }
+
+  resultadoEl.innerHTML = `<div class="resultado sucesso">✅ ${r.data.documentos.length} documento(s) encontrado(s) — confira o console do navegador para o XML de cada um.</div>`;
+  console.log('Documentos recebidos da SEFAZ:', r.data.documentos);
 }
 
 async function reconhecerNFeEntrada() {
