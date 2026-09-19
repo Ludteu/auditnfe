@@ -193,6 +193,15 @@ CREATE INDEX IF NOT EXISTS idx_movimentacoes_usuario_produto ON movimentacoes_es
 ALTER TABLE movimentacoes_estoque ADD CONSTRAINT chk_tipo_movimentacao
   CHECK (tipo IN ('entrada', 'saida', 'ajuste'));
 
+-- Cache de informes vistos na home do Portal da NF-e (ver nfePortalService.js)
+CREATE TABLE IF NOT EXISTS informes_nfe (
+  id VARCHAR PRIMARY KEY,
+  data DATE,
+  titulo VARCHAR NOT NULL,
+  url VARCHAR NOT NULL,
+  primeiraVezVistoEm TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Tabela de itens de NF-e (linhas emitidas pelo fluxo POST /api/nfe/emitir)
 CREATE TABLE IF NOT EXISTS itens_nfe (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -227,3 +236,4 @@ COMMENT ON TABLE produtos IS 'Produtos cadastrados com dados de estoque e tribut
 COMMENT ON TABLE movimentacoes_estoque IS 'Histórico de entradas, saídas e ajustes de estoque';
 COMMENT ON TABLE destinatarios IS 'Clientes (destinatários de NF-e) cadastrados por usuário';
 COMMENT ON TABLE itens_nfe IS 'Linhas de produto de uma NF-e emitida via POST /api/nfe/emitir';
+COMMENT ON TABLE informes_nfe IS 'Cache dos informes já vistos na home do Portal da NF-e (Notas Técnicas, tabelas atualizadas etc.)';

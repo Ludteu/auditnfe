@@ -492,7 +492,14 @@
     <section class="tab-panel" id="tab-atualizacoes">
       <div class="card">
         <h2>📰 Atualizações</h2>
-        <p class="hint">O changelog abaixo é gerado a partir do histórico real de mudanças deste sistema. A linha do tempo da Reforma Tributária é conteúdo de referência mantido manualmente — <strong>não é uma busca ao vivo no portal da NF-e</strong>: testamos e o portal oficial bloqueia esse tipo de acesso automatizado. Use os links oficiais abaixo para conferir a fonte primária.</p>
+        <p class="hint">O servidor verifica sozinho a cada 12h se saiu informe novo no Portal da NF-e (Notas Técnicas, tabelas de CFOP/NCM atualizadas etc.) e mantém a lista abaixo sempre com o que já foi visto. A linha do tempo da Reforma Tributária, mais abaixo, é conteúdo de referência mantido manualmente — essa sim não é buscada ao vivo.</p>
+      </div>
+
+      <div class="card">
+        <h2>📡 Informes do Portal da NF-e <button class="btn small secondary" onclick="verificarPortalNFe()" style="margin-left:8px" id="btnVerificarPortal">Verificar agora</button></h2>
+        <p class="hint">Lido direto da home do <a href="https://www.nfe.fazenda.gov.br/portal/principal.aspx" target="_blank" rel="noopener">Portal Nacional da NF-e</a> — se a Receita mudar o layout da página, a busca para de encontrar itens (avisa em vez de inventar dados).</p>
+        <div id="resultadoVerificacaoPortal"></div>
+        <div id="corpoInformesPortal"></div>
       </div>
 
       <div class="card">
@@ -559,7 +566,45 @@ function showTab(name) {
   if (name === 'atualizacoes') carregarAtualizacoes();
 }
 
+async function carregarInformesPortal() {
+  const r = await api('GET', '/atualizacoes/portal-nfe');
+  if (!r.ok) return;
+  renderizarInformesPortal(r.data.informes);
+}
+
+function renderizarInformesPortal(informes) {
+  document.getElementById('corpoInformesPortal').innerHTML = informes.length
+    ? informes.map(i => `
+      <div class="timeline-item">
+        <div class="data">${i.data ? new Date(i.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—'}</div>
+        <div class="titulo"><a href="${i.url}" target="_blank" rel="noopener">${i.titulo}</a></div>
+      </div>`).join('')
+    : '<div class="empty">Nenhum informe verificado ainda — clique em "Verificar agora".</div>';
+}
+
+async function verificarPortalNFe() {
+  const btn = document.getElementById('btnVerificarPortal');
+  const resultadoEl = document.getElementById('resultadoVerificacaoPortal');
+  btn.disabled = true; btn.textContent = 'Verificando...';
+  resultadoEl.innerHTML = '';
+
+  const r = await api('POST', '/atualizacoes/portal-nfe/verificar', {});
+  btn.disabled = false; btn.textContent = 'Verificar agora';
+
+  if (!r.ok) {
+    resultadoEl.innerHTML = `<div class="resultado erro">❌ ${r.data.error}</div>`;
+    return;
+  }
+
+  resultadoEl.innerHTML = r.data.novos.length
+    ? `<div class="resultado sucesso">📬 ${r.data.novos.length} informe(s) novo(s) desde a última verificação!</div>`
+    : `<div class="resultado sucesso">✅ Verificado — nenhuma novidade (${r.data.totalNoPortal} informes no portal, todos já conhecidos)</div>`;
+
+  carregarInformesPortal();
+}
+
 async function carregarAtualizacoes() {
+  carregarInformesPortal();
   const r = await api('GET', '/atualizacoes');
   if (!r.ok) return;
 

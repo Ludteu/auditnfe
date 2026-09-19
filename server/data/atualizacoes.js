@@ -5,13 +5,17 @@
  *   histórico real de commits — sempre preciso, porque é gerado a partir
  *   do que de fato mudou aqui.
  * - marcosReformaTributaria: marcos conhecidos e datados da Reforma
- *   Tributária (EC 132/2023, LC 214/2025). Não é uma busca ao vivo no
- *   portal da NF-e — testamos isso e o portal oficial (ASP.NET) bloqueia
- *   requisições automatizadas (retorna página de erro de sessão) e as
- *   páginas do gov.br sobre o tema exigem autenticação ou não têm URL
- *   estável. Por isso este é um conteúdo de referência, atualizado à mão
- *   quando algo relevante muda — não substitui acompanhar as fontes
- *   oficiais listadas em linksOficiais.
+ *   Tributária (EC 132/2023, LC 214/2025). Isso sim é conteúdo de
+ *   referência mantido à mão (não muda com frequência) — não substitui
+ *   acompanhar as fontes oficiais listadas em linksOficiais.
+ *
+ * Os informes técnicos do dia-a-dia (Notas Técnicas, atualização de
+ * tabelas de CFOP/NCM etc.) NÃO estão aqui — esses são buscados ao vivo
+ * de verdade em nfePortalService.js e cacheados na tabela informes_nfe
+ * (rota /api/atualizacoes/portal-nfe). A subpágina antiga de "atualização
+ * de sistema" do portal (atualizacaoSistemaLista.aspx) continua retornando
+ * erro mesmo num navegador real — mas a home do portal (principal.aspx)
+ * funciona e lista os mesmos informes na seção "Informes".
  */
 
 const changelogSistema = [
@@ -88,7 +92,7 @@ const marcosReformaTributaria = [
 ];
 
 const linksOficiais = [
-  { titulo: 'Portal Nacional da NF-e — Atualizações do Sistema', url: 'https://www.nfe.fazenda.gov.br/portal/atualizacaoSistemaLista.aspx' },
+  { titulo: 'Portal Nacional da NF-e — Página inicial (seção "Informes")', url: 'https://www.nfe.fazenda.gov.br/portal/principal.aspx' },
   { titulo: 'gov.br — Reforma Tributária', url: 'https://www.gov.br/fazenda/pt-br/acesso-a-informacao/acoes-e-programas/reforma-tributaria' },
   { titulo: 'Planalto — LC 214/2025 (texto integral)', url: 'https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp214.htm' }
 ];

@@ -12,6 +12,7 @@ const estoqueRoutes = require('./routes/estoque');
 const fiscalRoutes = require('./routes/fiscal');
 const destinatarioRoutes = require('./routes/destinatario');
 const atualizacoesRoutes = require('./routes/atualizacoes');
+const nfePortalService = require('./services/nfePortalService');
 
 const app = express();
 
@@ -62,6 +63,26 @@ sequelize.sync({ alter: false }).then(() => {
     console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
     console.log(`📊 Ambiente: ${process.env.NODE_ENV}`);
   });
+
+  // Verifica novos informes do Portal da NF-e (Notas Técnicas, tabelas
+  // atualizadas etc.) ao iniciar e depois periodicamente — é isso que
+  // mantém a aba "Atualizações" avisando sem precisar de ação manual.
+  const INTERVALO_VERIFICACAO_MS = 12 * 60 * 60 * 1000; // 12h
+
+  const verificarInformesPortal = () => {
+    nfePortalService.verificarEAtualizarCache()
+      .then(({ novos, totalNoPortal }) => {
+        if (novos.length > 0) {
+          console.log(`📰 ${novos.length} novo(s) informe(s) do Portal da NF-e: ${novos.map(n => n.titulo).join(' | ')}`);
+        } else {
+          console.log(`📰 Portal da NF-e verificado (${totalNoPortal} informes, nenhum novo)`);
+        }
+      })
+      .catch((err) => console.warn('⚠️ Não foi possível verificar o Portal da NF-e agora:', err.message));
+  };
+
+  verificarInformesPortal();
+  setInterval(verificarInformesPortal, INTERVALO_VERIFICACAO_MS);
 }).catch(err => {
   console.error('❌ Erro ao conectar BD:', err);
   process.exit(1);
