@@ -41,6 +41,34 @@ const Usuario = sequelize.define('Usuario', {
     type: DataTypes.STRING(2),
     allowNull: true
   },
+  nomeFantasia: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  cidade: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  cep: {
+    type: DataTypes.STRING(8),
+    allowNull: true
+  },
+  logradouro: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  numero: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  bairro: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  telefone: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   ativo: {
     type: DataTypes.BOOLEAN,
     defaultValue: true

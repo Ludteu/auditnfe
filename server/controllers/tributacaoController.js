@@ -1,9 +1,13 @@
 const NFe = require('../models/NFe');
 const Produto = require('../models/Produto');
 const Usuario = require('../models/Usuario');
+const MovimentacaoEstoque = require('../models/MovimentacaoEstoque');
+const sequelize = require('../config/database');
 const tributacaoService = require('../services/tributacaoService');
 const spedService = require('../services/spedService');
 const fiscalRulesService = require('../services/fiscalRulesService');
+const estoqueService = require('../services/estoqueService');
+const { validarXmlBasico } = require('../utils/xmlHelper');
 
 /**
  * Extrai tributação de um XML enviado diretamente ou de uma NF-e já cadastrada
@@ -150,6 +154,123 @@ const sugerirClassificacao = async (req, res) => {
   }
 };
 
+/**
+ * Importa o XML de uma NF-e de COMPRA (recebida de um fornecedor) e
+ * reconhece automaticamente os produtos nela contidos: cria os que não
+ * existem no catálogo (usando NCM/CFOP/CST extraídos do próprio XML) e
+ * dá entrada em estoque nos que já existem, tudo em uma única transação.
+ *
+ * Idempotente: se a mesma chave de acesso já foi reconhecida antes
+ * (já existem movimentações de estoque ligadas a ela), recusa reimportar
+ * para não duplicar entrada de estoque.
+ */
+const importarNotaCompra = async (req, res) => {
+  try {
+    const usuarioId = req.usuario.id;
+    const { xmlContent, itensFinalidade } = req.body;
+
+    if (!xmlContent) {
+      return res.status(400).json({ error: 'xmlContent é obrigatório' });
+    }
+
+    await validarXmlBasico(xmlContent);
+    const cabecalho = await tributacaoService.extrairCabecalho(xmlContent);
+
+    if (!cabecalho.chaveNFe) {
+      return res.status(400).json({ error: 'Não foi possível extrair a chave de acesso do XML' });
+    }
+
+    let nfe = await NFe.findOne({ where: { chaveNFe: cabecalho.chaveNFe, usuarioId } });
+
+    if (nfe) {
+      const jaReconhecida = await MovimentacaoEstoque.findOne({ where: { nfeId: nfe.id } });
+      if (jaReconhecida) {
+        return res.status(409).json({ error: 'Essa NF-e já foi reconhecida anteriormente — os produtos já foram cadastrados/atualizados' });
+      }
+    } else {
+      const itensParaValor = await tributacaoService.extrairTributacao(xmlContent);
+      const valorTotal = Number(itensParaValor.reduce((soma, i) => soma + (i.valorProduto || 0), 0).toFixed(2));
+
+      nfe = await NFe.create({
+        usuarioId,
+        chaveNFe: cabecalho.chaveNFe,
+        cnpj: cabecalho.emitenteCnpj || '00000000000000',
+        numero: cabecalho.numero || 0,
+        serie: cabecalho.serie || 1,
+        xmlContent,
+        direcao: 'recebida',
+        naturezaOperacao: cabecalho.naturezaOperacao || 'Compra',
+        dataEmissao: cabecalho.dataEmissao ? new Date(cabecalho.dataEmissao) : new Date(),
+        valor: valorTotal,
+        // Campos nomeCliente/cpfCnpjCliente guardam "a outra parte da nota":
+        // no fluxo de emissão é o cliente, aqui é o fornecedor emitente.
+        nomeCliente: cabecalho.emitenteNome,
+        cpfCnpjCliente: cabecalho.emitenteCnpj,
+        statusSEFAZ: 'autorizada'
+      });
+    }
+
+    const itens = await tributacaoService.extrairTributacao(xmlContent);
+    const overrides = Array.isArray(itensFinalidade) ? itensFinalidade : [];
+
+    const produtosCriados = [];
+    const produtosAtualizados = [];
+
+    await sequelize.transaction(async (t) => {
+      for (const item of itens) {
+        if (!item.codigo || !item.quantidade) continue;
+
+        const override = overrides.find((o) => o.codigo === item.codigo);
+        const finalidade = override?.finalidade || 'revenda';
+
+        let produto = await Produto.findOne({ where: { usuarioId, codigo: item.codigo }, transaction: t });
+        let criado = false;
+
+        if (!produto) {
+          produto = await Produto.create({
+            usuarioId,
+            codigo: item.codigo,
+            descricao: item.descricao || item.codigo,
+            finalidade,
+            quantidade: 0,
+            precoCusto: item.valorUnitario || 0,
+            precoMedioCusto: item.valorUnitario || 0,
+            precoVenda: 0,
+            ncm: item.ncm,
+            cfop: item.cfop,
+            cstIcms: item.icms.cst,
+            icmsAliquota: item.icms.aliquota,
+            cstIpi: item.ipi.cst,
+            ipiAliquota: item.ipi.aliquota
+          }, { transaction: t });
+          criado = true;
+        }
+
+        const { produto: produtoAtualizado } = await estoqueService.registrarEntrada(usuarioId, {
+          produtoId: produto.id,
+          quantidade: item.quantidade,
+          precoUnitario: item.valorUnitario,
+          motivo: `Entrada NF-e ${cabecalho.numero || ''} — ${cabecalho.emitenteNome || 'fornecedor'}`.trim(),
+          nfeId: nfe.id
+        }, t);
+
+        (criado ? produtosCriados : produtosAtualizados).push(produtoAtualizado);
+      }
+    });
+
+    res.status(201).json({
+      mensagem: 'NF-e de compra reconhecida com sucesso',
+      nfe,
+      emitente: { nome: cabecalho.emitenteNome, cnpj: cabecalho.emitenteCnpj },
+      totalItens: itens.length,
+      produtosCriados,
+      produtosAtualizados
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 module.exports = {
   extrair,
   preencherProduto,
@@ -157,5 +278,6 @@ module.exports = {
   resumo,
   gerarEfd,
   downloadEfd,
-  sugerirClassificacao
+  sugerirClassificacao,
+  importarNotaCompra
 };

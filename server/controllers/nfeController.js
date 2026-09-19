@@ -19,12 +19,13 @@ const { Op } = require('sequelize');
 const listar = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
-    const { status, cnpj, dataInicio, dataFim, pagina = 1, limite = 20 } = req.query;
+    const { status, cnpj, direcao, dataInicio, dataFim, pagina = 1, limite = 20 } = req.query;
 
     const where = { usuarioId };
-    
+
     if (status) where.statusSEFAZ = status;
     if (cnpj) where.cnpj = cnpj;
+    if (direcao) where.direcao = direcao;
     
     if (dataInicio || dataFim) {
       where.dataEmissao = {};
@@ -338,7 +339,10 @@ const obterXml = async (req, res) => {
 const TIPOS_OPERACAO_EMISSAO = ['venda', 'devolucaoDeCompra'];
 
 const gerarProximoNumero = async (usuarioId, serie) => {
-  const ultima = await NFe.findOne({ where: { usuarioId, serie }, order: [['numero', 'DESC']] });
+  // Só considera notas EMITIDAS por esta empresa — a numeração de notas
+  // recebidas (importadas de fornecedores) pertence a quem as emitiu, não
+  // pode competir com a numeração de vendas desta empresa.
+  const ultima = await NFe.findOne({ where: { usuarioId, serie, direcao: 'emitida' }, order: [['numero', 'DESC']] });
   return ultima ? ultima.numero + 1 : 1;
 };
 

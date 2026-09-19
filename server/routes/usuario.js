@@ -2,11 +2,26 @@ const express = require('express');
 const autenticacao = require('../middleware/autenticacao');
 const Usuario = require('../models/Usuario');
 const Certificado = require('../models/Certificado');
+const { consultarCnpj } = require('../services/cnpjLookupService');
 
 const router = express.Router();
 
 // Proteger rotas com autenticação
 router.use(autenticacao);
+
+/**
+ * GET /api/usuarios/consulta-cnpj/:cnpj
+ * Consulta dados públicos do CNPJ na Receita Federal (via BrasilAPI) para
+ * pré-preencher o cadastro da empresa. Não salva nada — só devolve os dados.
+ */
+router.get('/consulta-cnpj/:cnpj', async (req, res) => {
+  try {
+    const dados = await consultarCnpj(req.params.cnpj);
+    res.json(dados);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
 
 /**
  * GET /api/usuarios/perfil
@@ -34,7 +49,7 @@ router.get('/perfil', async (req, res) => {
  */
 router.put('/perfil', async (req, res) => {
   try {
-    const { nome, razaoSocial, regimeTributario, uf } = req.body;
+    const { nome, razaoSocial, regimeTributario, uf, nomeFantasia, cidade, cep, logradouro, numero, bairro, telefone } = req.body;
     const usuario = await Usuario.findByPk(req.usuario.id);
 
     if (!usuario) {
@@ -52,6 +67,13 @@ router.put('/perfil', async (req, res) => {
     if (nome) usuario.nome = nome;
     if (razaoSocial) usuario.razaoSocial = razaoSocial;
     if (uf) usuario.uf = String(uf).toUpperCase();
+    if (nomeFantasia !== undefined) usuario.nomeFantasia = nomeFantasia;
+    if (cidade !== undefined) usuario.cidade = cidade;
+    if (cep !== undefined) usuario.cep = cep;
+    if (logradouro !== undefined) usuario.logradouro = logradouro;
+    if (numero !== undefined) usuario.numero = numero;
+    if (bairro !== undefined) usuario.bairro = bairro;
+    if (telefone !== undefined) usuario.telefone = telefone;
 
     await usuario.save();
 

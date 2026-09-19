@@ -21,14 +21,16 @@ const calcularPrecoMedio = (saldoAnterior, precoMedioAnterior, quantidadeEntrada
 };
 
 /**
- * Registra entrada de estoque, atualizando saldo e preço médio de custo
+ * Registra entrada de estoque, atualizando saldo e preço médio de custo.
+ * Aceita uma transação externa (ex: importação de nota de compra com
+ * vários itens precisando ser tudo-ou-nada) — sem ela, abre a própria.
  */
-const registrarEntrada = async (usuarioId, { produtoId, quantidade, precoUnitario, motivo, nfeId }) => {
+const registrarEntrada = async (usuarioId, { produtoId, quantidade, precoUnitario, motivo, nfeId }, transacaoExterna) => {
   if (!quantidade || quantidade <= 0) {
     throw new Error('Quantidade de entrada deve ser maior que zero');
   }
 
-  return sequelize.transaction(async (t) => {
+  const executar = async (t) => {
     const produto = await Produto.findOne({
       where: { id: produtoId, usuarioId },
       transaction: t,
@@ -68,7 +70,9 @@ const registrarEntrada = async (usuarioId, { produtoId, quantidade, precoUnitari
     }, { transaction: t });
 
     return { produto, movimentacao };
-  });
+  };
+
+  return transacaoExterna ? executar(transacaoExterna) : sequelize.transaction(executar);
 };
 
 /**

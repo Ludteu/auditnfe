@@ -2,12 +2,13 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Emitir NF-e</title>
+<title>NFe Emitter</title>
 <style>
   :root {
     --bg: #0b0f1a;
     --panel: #141b2b;
     --panel-2: #0f1524;
+    --sidebar: #0d1220;
     --border: #262f45;
     --text: #e9edf7;
     --muted: #8b97b0;
@@ -31,16 +32,40 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 24px;
+    padding: 12px 20px;
     border-bottom: 1px solid var(--border);
-    position: sticky;
-    top: 0;
     background: var(--bg);
-    z-index: 10;
   }
-  header h1 { font-size: 16px; margin: 0; display: flex; align-items: center; gap: 8px; }
-  header .empresa { font-size: 12px; color: var(--muted); }
-  main { max-width: 920px; margin: 0 auto; padding: 20px 24px 80px; }
+  header h1 { font-size: 15px; margin: 0; display: flex; align-items: center; gap: 8px; }
+  header .empresa { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 14px; }
+  .shell { display: flex; min-height: calc(100vh - 49px); }
+  .sidebar {
+    width: 200px;
+    flex-shrink: 0;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    padding: 14px 10px;
+  }
+  .sidebar button {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 9px 11px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    margin-bottom: 2px;
+  }
+  .sidebar button:hover { background: var(--panel-2); color: var(--text); }
+  .sidebar button.active { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+  .content { flex: 1; padding: 22px 28px; max-width: 980px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
   .card {
     background: var(--panel);
     border: 1px solid var(--border);
@@ -48,16 +73,10 @@
     padding: 18px;
     margin-bottom: 16px;
   }
-  .card h2 {
-    font-size: 14px;
-    margin: 0 0 4px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+  .card h2 { font-size: 14px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
   .card .hint { font-size: 12px; color: var(--muted); margin: 0 0 14px; }
   label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
-  input, select {
+  input, select, textarea {
     width: 100%;
     padding: 9px 10px;
     border-radius: 7px;
@@ -65,11 +84,12 @@
     background: var(--panel-2);
     color: var(--text);
     font-size: 13.5px;
+    font-family: inherit;
   }
-  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
   .row { display: flex; gap: 10px; }
   .row > * { flex: 1; }
-  button {
+  button.btn {
     padding: 9px 14px;
     border-radius: 7px;
     border: none;
@@ -79,51 +99,29 @@
     font-weight: 600;
     cursor: pointer;
   }
-  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
-  button.danger { background: var(--err-dim); color: var(--err); }
-  button.small { padding: 5px 9px; font-size: 12px; }
-  button:hover { filter: brightness(1.08); }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .pill {
-    font-size: 11px;
-    padding: 3px 9px;
-    border-radius: 999px;
-    background: var(--panel-2);
-    color: var(--muted);
-  }
+  button.btn.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.btn.danger { background: var(--err-dim); color: var(--err); }
+  button.btn.small { padding: 5px 9px; font-size: 12px; }
+  button.btn:hover { filter: brightness(1.08); }
+  button.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .pill { font-size: 11px; padding: 3px 9px; border-radius: 999px; background: var(--panel-2); color: var(--muted); }
   .pill.ok { background: var(--ok-dim); color: var(--ok); }
   .pill.warn { background: var(--warn-dim); color: var(--warn); }
   .pill.err { background: var(--err-dim); color: var(--err); }
   .search-wrap { position: relative; }
   .dropdown {
-    position: absolute;
-    left: 0; right: 0; top: 100%;
-    background: var(--panel-2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-top: 4px;
-    max-height: 220px;
-    overflow-y: auto;
-    z-index: 20;
+    position: absolute; left: 0; right: 0; top: 100%;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    margin-top: 4px; max-height: 220px; overflow-y: auto; z-index: 20;
   }
-  .dropdown-item {
-    padding: 9px 11px;
-    cursor: pointer;
-    font-size: 13px;
-    border-bottom: 1px solid var(--border);
-  }
+  .dropdown-item { padding: 9px 11px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--border); }
   .dropdown-item:last-child { border-bottom: none; }
   .dropdown-item:hover { background: var(--accent-dim); }
   .dropdown-item .sub { color: var(--muted); font-size: 11.5px; }
   .chip {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--panel-2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 12px;
-    margin-top: 8px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; margin-top: 8px;
   }
   .chip .name { font-weight: 600; font-size: 13.5px; }
   .chip .meta { font-size: 11.5px; color: var(--muted); }
@@ -132,13 +130,7 @@
   th { color: var(--muted); font-weight: 500; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em; }
   td input { padding: 5px 6px; font-size: 12.5px; }
   .totais { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
-  .totais .item {
-    flex: 1; min-width: 130px;
-    background: var(--panel-2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 12px;
-  }
+  .totais .item { flex: 1; min-width: 130px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
   .totais .item .v { font-size: 18px; font-weight: 700; }
   .totais .item .k { font-size: 11px; color: var(--muted); }
   .avisos { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--warn-dim); border: 1px solid rgba(224,166,62,0.3); font-size: 12px; color: var(--warn); }
@@ -151,135 +143,252 @@
   [hidden] { display: none !important; }
   a { color: var(--accent); }
   .link-btn { background: none; border: none; color: var(--accent); font-size: 12px; padding: 0; text-decoration: underline; cursor: pointer; }
+  .dropzone {
+    border: 1.5px dashed var(--border); border-radius: 10px; padding: 24px;
+    text-align: center; font-size: 13px; color: var(--muted); cursor: pointer;
+  }
+  .dropzone:hover { border-color: var(--accent); color: var(--text); }
+  .empty { color: var(--muted); font-size: 12.5px; padding: 10px 0; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>🧾 Emissão de NF-e</h1>
-  <div class="empresa"><a href="/console.html" style="margin-right:14px">console de testes</a><span id="empresaInfo"></span></div>
+  <h1>🧾 NFe Emitter</h1>
+  <div class="empresa" id="empresaInfoWrap" hidden>
+    <a href="/console.html">console de testes</a>
+    <span id="empresaInfo"></span>
+    <button class="link-btn" onclick="sair()">sair</button>
+  </div>
 </header>
-
-<main>
 
 <div id="loginCard" class="card">
   <h2>Entrar</h2>
-  <p class="hint">Use uma conta já registrada no console de testes, ou crie uma nova aqui.</p>
+  <p class="hint">Use uma conta já registrada, ou crie uma nova aqui.</p>
   <label>Nome da empresa</label><input id="loginNome" value="Minha Empresa">
   <label>Email</label><input id="loginEmail" value="">
   <label>CNPJ (14 dígitos)</label><input id="loginCnpj" value="">
   <label>Senha</label><input id="loginSenha" value="senha123456">
   <div class="row" style="margin-top:12px">
-    <button onclick="registrar()">Criar conta</button>
-    <button class="secondary" onclick="login()">Entrar</button>
+    <button class="btn" onclick="registrar()">Criar conta</button>
+    <button class="btn secondary" onclick="login()">Entrar</button>
   </div>
   <div id="loginErro" class="resultado erro" hidden></div>
 </div>
 
-<div id="app" hidden>
+<div class="shell" id="appShell" hidden>
+  <nav class="sidebar">
+    <button data-tab="emitir" onclick="showTab('emitir')">🧾 Emitir NF-e</button>
+    <button data-tab="entrada" onclick="showTab('entrada')">📥 Buscar NF-e (entrada)</button>
+    <button data-tab="clientes" onclick="showTab('clientes')">👥 Clientes</button>
+    <button data-tab="produtos" onclick="showTab('produtos')">📦 Produtos</button>
+    <button data-tab="empresa" onclick="showTab('empresa')">🏢 Minha empresa</button>
+  </nav>
 
-  <div class="card" id="empresaCard">
-    <h2>Sua empresa <span id="empresaBadge" class="pill warn">configurar</span></h2>
-    <p class="hint">A UF decide se a venda é interna ou interestadual; o regime decide CST (normal) ou CSOSN (Simples Nacional). Sem isso, o CFOP ainda é sugerido, mas sem a alíquota certa.</p>
-    <div class="row">
-      <div><label>UF da empresa</label><input id="empresaUf" maxlength="2" placeholder="SP" style="text-transform:uppercase"></div>
-      <div>
-        <label>Regime tributário</label>
-        <select id="empresaRegime">
-          <option value="">— selecione —</option>
-          <option value="simples_nacional">Simples Nacional</option>
-          <option value="lucro_presumido">Lucro Presumido</option>
-          <option value="lucro_real">Lucro Real</option>
-        </select>
+  <main class="content">
+
+    <!-- ===================== EMITIR NF-e ===================== -->
+    <section class="tab-panel" id="tab-emitir">
+      <div class="card">
+        <h2>1. Destinatário</h2>
+        <div class="search-wrap">
+          <input id="buscaDestinatario" placeholder="Buscar cliente por nome ou CPF/CNPJ..." oninput="buscarDestinatarios()">
+          <div id="dropdownDestinatario" class="dropdown" hidden></div>
+        </div>
+        <button class="link-btn" style="margin-top:8px" onclick="toggleNovoCliente()">+ cadastrar novo cliente</button>
+
+        <div id="novoClienteForm" hidden style="margin-top:10px">
+          <div class="row">
+            <div><label>Nome</label><input id="novoClienteNome"></div>
+            <div><label>CPF/CNPJ</label><input id="novoClienteDoc"></div>
+          </div>
+          <div class="row">
+            <div><label>UF</label><input id="novoClienteUf" maxlength="2" style="text-transform:uppercase"></div>
+            <div><label>Cidade</label><input id="novoClienteCidade"></div>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;flex-direction:row;margin-top:10px">
+            <input type="checkbox" id="novoClienteContribuinte" style="width:auto">
+            <span style="font-size:12.5px;color:var(--text)">Contribuinte de ICMS (tem inscrição estadual)</span>
+          </label>
+          <button class="btn secondary" style="margin-top:10px" onclick="salvarNovoCliente()">Salvar cliente</button>
+        </div>
+
+        <div id="destinatarioSelecionado" hidden class="chip">
+          <div><div class="name" id="destNome"></div><div class="meta" id="destMeta"></div></div>
+          <button class="btn small secondary" onclick="limparDestinatario()">Trocar</button>
+        </div>
       </div>
-    </div>
-    <button onclick="salvarEmpresa()" style="margin-top:12px">Salvar</button>
-  </div>
 
-  <div class="card">
-    <h2>1. Destinatário</h2>
-    <div class="search-wrap">
-      <input id="buscaDestinatario" placeholder="Buscar cliente por nome ou CPF/CNPJ..." oninput="buscarDestinatarios()">
-      <div id="dropdownDestinatario" class="dropdown" hidden></div>
-    </div>
-    <button class="link-btn" style="margin-top:8px" onclick="toggleNovoCliente()">+ cadastrar novo cliente</button>
-
-    <div id="novoClienteForm" hidden style="margin-top:10px">
-      <div class="row">
-        <div><label>Nome</label><input id="novoClienteNome"></div>
-        <div><label>CPF/CNPJ</label><input id="novoClienteDoc"></div>
+      <div class="card">
+        <h2>2. Itens</h2>
+        <div class="search-wrap">
+          <input id="buscaProduto" placeholder="Buscar produto por código ou descrição..." oninput="buscarProdutos()">
+          <div id="dropdownProduto" class="dropdown" hidden></div>
+        </div>
+        <table id="tabelaItens">
+          <thead><tr><th>Produto</th><th>CFOP</th><th>Qtd</th><th>Vl. unit.</th><th>Subtotal</th><th></th></tr></thead>
+          <tbody id="corpoItens"></tbody>
+        </table>
       </div>
-      <div class="row">
-        <div><label>UF</label><input id="novoClienteUf" maxlength="2" style="text-transform:uppercase"></div>
-        <div><label>Cidade</label><input id="novoClienteCidade"></div>
+
+      <div class="card">
+        <h2>3. Revisão e emissão</h2>
+        <label>Natureza da operação</label>
+        <input id="naturezaOperacao" value="Venda de mercadoria">
+        <label style="display:flex;align-items:center;gap:6px;flex-direction:row;margin-top:10px">
+          <input type="checkbox" id="baixarEstoque" checked style="width:auto">
+          <span style="font-size:12.5px;color:var(--text)">Baixar estoque automaticamente ao emitir</span>
+        </label>
+        <div class="totais">
+          <div class="item"><div class="v" id="totalItens">0</div><div class="k">itens</div></div>
+          <div class="item"><div class="v" id="totalGeral">R$ 0,00</div><div class="k">total da nota</div></div>
+        </div>
+        <button class="btn" onclick="emitirNFe()" style="margin-top:14px" id="btnEmitir">Emitir NF-e</button>
+        <div id="resultadoEmissao"></div>
       </div>
-      <label style="display:flex;align-items:center;gap:6px;flex-direction:row;margin-top:10px">
-        <input type="checkbox" id="novoClienteContribuinte" style="width:auto">
-        <span style="font-size:12.5px;color:var(--text)">Contribuinte de ICMS (tem inscrição estadual)</span>
-      </label>
-      <button class="secondary" style="margin-top:10px" onclick="salvarNovoCliente()">Salvar cliente</button>
-    </div>
 
-    <div id="destinatarioSelecionado" hidden class="chip">
-      <div>
-        <div class="name" id="destNome"></div>
-        <div class="meta" id="destMeta"></div>
+      <div class="card">
+        <h2>NF-es emitidas <button class="btn small secondary" onclick="carregarNFes()" style="margin-left:8px">Atualizar</button></h2>
+        <table>
+          <thead><tr><th>Nº</th><th>Cliente</th><th>Valor</th><th>Status</th><th>Emitida em</th><th></th></tr></thead>
+          <tbody id="corpoNFes"></tbody>
+        </table>
       </div>
-      <button class="small secondary" onclick="limparDestinatario()">Trocar</button>
-    </div>
-  </div>
+    </section>
 
-  <div class="card">
-    <h2>2. Itens</h2>
-    <div class="search-wrap">
-      <input id="buscaProduto" placeholder="Buscar produto por código ou descrição..." oninput="buscarProdutos()">
-      <div id="dropdownProduto" class="dropdown" hidden></div>
-    </div>
+    <!-- ===================== BUSCAR NF-e (ENTRADA) ===================== -->
+    <section class="tab-panel" id="tab-entrada">
+      <div class="card">
+        <h2>📥 Reconhecer NF-e de compra</h2>
+        <p class="hint">Envie o XML de uma NF-e recebida de um fornecedor. O sistema lê os itens e cadastra sozinho os produtos que ainda não existem no seu catálogo (com NCM/CFOP/CST já preenchidos a partir do XML) e dá entrada em estoque nos que já existem.</p>
 
-    <table id="tabelaItens">
-      <thead>
-        <tr>
-          <th>Produto</th>
-          <th>CFOP</th>
-          <th>Qtd</th>
-          <th>Vl. unit.</th>
-          <th>Subtotal</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="corpoItens"></tbody>
-    </table>
-  </div>
+        <div class="dropzone" id="dropzoneXml" onclick="document.getElementById('arquivoXml').click()">
+          📄 Clique para escolher um arquivo .xml — ou cole o conteúdo abaixo
+        </div>
+        <input type="file" id="arquivoXml" accept=".xml" hidden onchange="lerArquivoXml(event)">
 
-  <div class="card">
-    <h2>3. Revisão e emissão</h2>
-    <label>Natureza da operação</label>
-    <input id="naturezaOperacao" value="Venda de mercadoria">
-    <label style="display:flex;align-items:center;gap:6px;flex-direction:row;margin-top:10px">
-      <input type="checkbox" id="baixarEstoque" checked style="width:auto">
-      <span style="font-size:12.5px;color:var(--text)">Baixar estoque automaticamente ao emitir</span>
-    </label>
+        <label>Ou cole o XML aqui</label>
+        <textarea id="xmlColado" rows="6" placeholder="<?xml version=&quot;1.0&quot;?>..."></textarea>
 
-    <div class="totais">
-      <div class="item"><div class="v" id="totalItens">0</div><div class="k">itens</div></div>
-      <div class="item"><div class="v" id="totalGeral">R$ 0,00</div><div class="k">total da nota</div></div>
-    </div>
+        <button class="btn" style="margin-top:12px" id="btnReconhecer" onclick="reconhecerNFeEntrada()">Reconhecer NF-e</button>
+        <div id="resultadoEntrada"></div>
+      </div>
 
-    <button onclick="emitirNFe()" style="margin-top:14px" id="btnEmitir">Emitir NF-e</button>
-    <div id="resultadoEmissao"></div>
-  </div>
+      <div class="card">
+        <h2>Notas de compra reconhecidas <button class="btn small secondary" onclick="carregarNotasRecebidas()" style="margin-left:8px">Atualizar</button></h2>
+        <table>
+          <thead><tr><th>Fornecedor</th><th>Valor</th><th>Recebida em</th><th></th></tr></thead>
+          <tbody id="corpoNotasRecebidas"></tbody>
+        </table>
+      </div>
+    </section>
 
-  <div class="card">
-    <h2>NF-es emitidas <button class="small secondary" onclick="carregarNFes()" style="margin-left:8px">Atualizar</button></h2>
-    <table>
-      <thead><tr><th>Nº</th><th>Cliente</th><th>Valor</th><th>Status</th><th>Emitida em</th><th></th></tr></thead>
-      <tbody id="corpoNFes"></tbody>
-    </table>
-  </div>
+    <!-- ===================== CLIENTES ===================== -->
+    <section class="tab-panel" id="tab-clientes">
+      <div class="card">
+        <h2>👥 Clientes <button class="btn small secondary" onclick="carregarClientes()" style="margin-left:8px">Atualizar</button></h2>
+        <button class="link-btn" onclick="toggleNovoClienteTab()">+ cadastrar novo cliente</button>
+        <div id="novoClienteTabForm" hidden style="margin-top:10px">
+          <div class="row">
+            <div><label>Nome</label><input id="ctNome"></div>
+            <div><label>CPF/CNPJ</label><input id="ctDoc"></div>
+          </div>
+          <div class="row">
+            <div><label>UF</label><input id="ctUf" maxlength="2" style="text-transform:uppercase"></div>
+            <div><label>Cidade</label><input id="ctCidade"></div>
+          </div>
+          <button class="btn secondary" style="margin-top:10px" onclick="salvarClienteTab()">Salvar</button>
+        </div>
+        <table>
+          <thead><tr><th>Nome</th><th>CPF/CNPJ</th><th>UF</th><th>Contribuinte ICMS</th></tr></thead>
+          <tbody id="corpoClientes"></tbody>
+        </table>
+      </div>
+    </section>
 
+    <!-- ===================== PRODUTOS ===================== -->
+    <section class="tab-panel" id="tab-produtos">
+      <div class="card">
+        <h2>📦 Produtos <button class="btn small secondary" onclick="carregarProdutosTab()" style="margin-left:8px">Atualizar</button></h2>
+        <button class="link-btn" onclick="toggleNovoProduto()">+ cadastrar novo produto</button>
+        <div id="novoProdutoForm" hidden style="margin-top:10px">
+          <div class="row">
+            <div><label>Código</label><input id="ptCodigo"></div>
+            <div><label>Descrição</label><input id="ptDescricao"></div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Finalidade</label>
+              <select id="ptFinalidade">
+                <option value="revenda">Revenda</option>
+                <option value="producao_propria">Produção própria</option>
+                <option value="materia_prima_insumo">Matéria-prima / insumo</option>
+                <option value="uso_consumo">Uso e consumo</option>
+                <option value="ativo_imobilizado">Ativo imobilizado</option>
+              </select>
+            </div>
+            <div><label>NCM</label><input id="ptNcm"></div>
+          </div>
+          <div class="row">
+            <div><label>Qtd inicial</label><input id="ptQuantidade" value="0"></div>
+            <div><label>Preço custo</label><input id="ptPrecoCusto" value="0"></div>
+            <div><label>Preço venda</label><input id="ptPrecoVenda" value="0"></div>
+          </div>
+          <button class="btn secondary" style="margin-top:10px" onclick="salvarProdutoTab()">Salvar produto</button>
+        </div>
+        <table>
+          <thead><tr><th>Código</th><th>Descrição</th><th>Finalidade</th><th>Saldo</th><th>Custo médio</th><th>Venda</th></tr></thead>
+          <tbody id="corpoProdutos"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================== MINHA EMPRESA ===================== -->
+    <section class="tab-panel" id="tab-empresa">
+      <div class="card">
+        <h2>🏢 Minha empresa <span id="empresaBadge" class="pill warn">configurar</span></h2>
+        <p class="hint">Digite o CNPJ e clique em Buscar para preencher os dados automaticamente com o cadastro público da Receita Federal. O CNPJ da sua conta não é alterado por essa busca — ela só consulta.</p>
+
+        <label>CNPJ</label>
+        <div class="row">
+          <input id="empCnpj" maxlength="18">
+          <button class="btn secondary" style="flex:0 0 auto" onclick="buscarCnpj()" id="btnBuscarCnpj">Buscar</button>
+        </div>
+        <div id="cnpjStatus"></div>
+
+        <div class="row">
+          <div><label>Razão social</label><input id="empRazaoSocial"></div>
+          <div><label>Nome fantasia</label><input id="empNomeFantasia"></div>
+        </div>
+        <div class="row">
+          <div><label>UF</label><input id="empUf" maxlength="2" style="text-transform:uppercase"></div>
+          <div><label>Cidade</label><input id="empCidade"></div>
+          <div>
+            <label>Regime tributário</label>
+            <select id="empresaRegime">
+              <option value="">— selecione —</option>
+              <option value="simples_nacional">Simples Nacional</option>
+              <option value="lucro_presumido">Lucro Presumido</option>
+              <option value="lucro_real">Lucro Real</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div><label>CEP</label><input id="empCep"></div>
+          <div><label>Logradouro</label><input id="empLogradouro"></div>
+          <div><label>Número</label><input id="empNumero"></div>
+        </div>
+        <div class="row">
+          <div><label>Bairro</label><input id="empBairro"></div>
+          <div><label>Telefone</label><input id="empTelefone"></div>
+        </div>
+
+        <button class="btn" onclick="salvarEmpresa()" style="margin-top:14px">Salvar</button>
+      </div>
+    </section>
+
+  </main>
 </div>
-
-</main>
 
 <script>
 const baseUrl = '/api';
@@ -299,6 +408,23 @@ async function api(method, path, body) {
   return { ok: res.ok, status: res.status, data };
 }
 
+function sair() {
+  token = null; empresa = null;
+  document.getElementById('appShell').hidden = true;
+  document.getElementById('empresaInfoWrap').hidden = true;
+  document.getElementById('loginCard').hidden = false;
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.sidebar button').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelector(`.sidebar button[data-tab="${name}"]`).classList.add('active');
+  if (name === 'clientes') carregarClientes();
+  if (name === 'produtos') carregarProdutosTab();
+  if (name === 'entrada') carregarNotasRecebidas();
+}
+
 async function registrar() {
   const r = await api('POST', '/auth/registrar', {
     nome: document.getElementById('loginNome').value,
@@ -307,7 +433,7 @@ async function registrar() {
     senha: document.getElementById('loginSenha').value,
     razaoSocial: document.getElementById('loginNome').value
   });
-  if (r.ok) { onLogin(r.data); } else { mostrarErroLogin(r.data.error || JSON.stringify(r.data)); }
+  if (r.ok) onLogin(r.data); else mostrarErroLogin(r.data.error || JSON.stringify(r.data));
 }
 
 async function login() {
@@ -315,7 +441,7 @@ async function login() {
     email: document.getElementById('loginEmail').value,
     senha: document.getElementById('loginSenha').value
   });
-  if (r.ok) { onLogin(r.data); } else { mostrarErroLogin(r.data.error || JSON.stringify(r.data)); }
+  if (r.ok) onLogin(r.data); else mostrarErroLogin(r.data.error || JSON.stringify(r.data));
 }
 
 function mostrarErroLogin(msg) {
@@ -327,9 +453,11 @@ function mostrarErroLogin(msg) {
 async function onLogin(data) {
   token = data.token;
   document.getElementById('loginCard').hidden = true;
-  document.getElementById('app').hidden = false;
+  document.getElementById('appShell').hidden = false;
+  document.getElementById('empresaInfoWrap').hidden = false;
   await carregarPerfil();
   await carregarNFes();
+  showTab('emitir');
 }
 
 async function carregarPerfil() {
@@ -337,30 +465,77 @@ async function carregarPerfil() {
   if (!r.ok) return;
   empresa = r.data;
   document.getElementById('empresaInfo').textContent = `${empresa.nome} — CNPJ ${empresa.cnpj}`;
-  document.getElementById('empresaUf').value = empresa.uf || '';
+  document.getElementById('empCnpj').value = empresa.cnpj;
+  document.getElementById('empRazaoSocial').value = empresa.razaoSocial || '';
+  document.getElementById('empNomeFantasia').value = empresa.nomeFantasia || '';
+  document.getElementById('empUf').value = empresa.uf || '';
+  document.getElementById('empCidade').value = empresa.cidade || '';
   document.getElementById('empresaRegime').value = empresa.regimeTributario || '';
+  document.getElementById('empCep').value = empresa.cep || '';
+  document.getElementById('empLogradouro').value = empresa.logradouro || '';
+  document.getElementById('empNumero').value = empresa.numero || '';
+  document.getElementById('empBairro').value = empresa.bairro || '';
+  document.getElementById('empTelefone').value = empresa.telefone || '';
   atualizarBadgeEmpresa();
 }
 
 function atualizarBadgeEmpresa() {
   const badge = document.getElementById('empresaBadge');
   if (empresa.uf && empresa.regimeTributario) {
-    badge.textContent = 'configurado';
-    badge.className = 'pill ok';
+    badge.textContent = 'configurado'; badge.className = 'pill ok';
   } else {
-    badge.textContent = 'incompleto';
-    badge.className = 'pill warn';
+    badge.textContent = 'incompleto'; badge.className = 'pill warn';
   }
 }
 
+async function buscarCnpj() {
+  const cnpj = document.getElementById('empCnpj').value;
+  const status = document.getElementById('cnpjStatus');
+  const btn = document.getElementById('btnBuscarCnpj');
+  btn.disabled = true; btn.textContent = 'Buscando...';
+  status.innerHTML = '';
+
+  const r = await api('GET', '/usuarios/consulta-cnpj/' + cnpj.replace(/\D/g, ''));
+  btn.disabled = false; btn.textContent = 'Buscar';
+
+  if (!r.ok) {
+    status.innerHTML = `<div class="resultado erro">❌ ${r.data.error}</div>`;
+    return;
+  }
+
+  const d = r.data;
+  document.getElementById('empRazaoSocial').value = d.razaoSocial || '';
+  document.getElementById('empNomeFantasia').value = d.nomeFantasia || '';
+  document.getElementById('empUf').value = d.uf || '';
+  document.getElementById('empCidade').value = d.cidade || '';
+  document.getElementById('empCep').value = d.cep || '';
+  document.getElementById('empLogradouro').value = d.logradouro || '';
+  document.getElementById('empNumero').value = d.numero || '';
+  document.getElementById('empBairro').value = d.bairro || '';
+  document.getElementById('empTelefone').value = d.telefone || '';
+  if (d.regimeTributarioSugerido) document.getElementById('empresaRegime').value = d.regimeTributarioSugerido;
+
+  status.innerHTML = `<div class="resultado sucesso">✅ ${d.razaoSocial} — situação: ${d.situacaoCadastral}${d.avisoRegime ? '<div class="avisos" style="margin-top:8px">' + d.avisoRegime + '</div>' : ''}</div>`;
+}
+
 async function salvarEmpresa() {
-  const uf = document.getElementById('empresaUf').value.toUpperCase();
-  const regimeTributario = document.getElementById('empresaRegime').value || null;
-  const r = await api('PUT', '/usuarios/perfil', { uf, regimeTributario });
+  const body = {
+    razaoSocial: document.getElementById('empRazaoSocial').value,
+    nomeFantasia: document.getElementById('empNomeFantasia').value,
+    uf: document.getElementById('empUf').value.toUpperCase(),
+    cidade: document.getElementById('empCidade').value,
+    regimeTributario: document.getElementById('empresaRegime').value || null,
+    cep: document.getElementById('empCep').value,
+    logradouro: document.getElementById('empLogradouro').value,
+    numero: document.getElementById('empNumero').value,
+    bairro: document.getElementById('empBairro').value,
+    telefone: document.getElementById('empTelefone').value
+  };
+  const r = await api('PUT', '/usuarios/perfil', body);
   if (r.ok) { empresa = r.data.usuario; atualizarBadgeEmpresa(); }
 }
 
-// ---------- Destinatário ----------
+// ---------- Destinatário (aba Emitir) ----------
 
 let buscaDestTimeout;
 function buscarDestinatarios() {
@@ -371,15 +546,12 @@ function buscarDestinatarios() {
   buscaDestTimeout = setTimeout(async () => {
     const r = await api('GET', '/destinatarios?busca=' + encodeURIComponent(termo));
     if (!r.ok) return;
-    if (r.data.destinatarios.length === 0) {
-      dropdown.innerHTML = '<div class="dropdown-item"><span class="sub">Nenhum cliente encontrado — cadastre um novo abaixo</span></div>';
-    } else {
-      dropdown.innerHTML = r.data.destinatarios.map(d => `
+    dropdown.innerHTML = r.data.destinatarios.length === 0
+      ? '<div class="dropdown-item"><span class="sub">Nenhum cliente encontrado — cadastre um novo abaixo</span></div>'
+      : r.data.destinatarios.map(d => `
         <div class="dropdown-item" onclick='selecionarDestinatario(${JSON.stringify(d).replace(/'/g, "&apos;")})'>
-          <div>${d.nome}</div>
-          <div class="sub">${d.cpfCnpj} — ${d.uf}</div>
+          <div>${d.nome}</div><div class="sub">${d.cpfCnpj} — ${d.uf}</div>
         </div>`).join('');
-    }
     dropdown.hidden = false;
   }, 250);
 }
@@ -400,28 +572,26 @@ function limparDestinatario() {
 }
 
 function toggleNovoCliente() {
-  const form = document.getElementById('novoClienteForm');
-  form.hidden = !form.hidden;
+  document.getElementById('novoClienteForm').hidden = !document.getElementById('novoClienteForm').hidden;
+}
+
+async function criarDestinatario(nome, cpfCnpj, uf, cidade, contribuinteIcms) {
+  return api('POST', '/destinatarios', { nome, cpfCnpj, uf: uf.toUpperCase(), cidade, contribuinteIcms });
 }
 
 async function salvarNovoCliente() {
-  const body = {
-    nome: document.getElementById('novoClienteNome').value,
-    cpfCnpj: document.getElementById('novoClienteDoc').value,
-    uf: document.getElementById('novoClienteUf').value.toUpperCase(),
-    cidade: document.getElementById('novoClienteCidade').value,
-    contribuinteIcms: document.getElementById('novoClienteContribuinte').checked
-  };
-  const r = await api('POST', '/destinatarios', body);
-  if (r.ok) {
-    selecionarDestinatario(r.data.destinatario);
-    document.getElementById('novoClienteForm').hidden = true;
-  } else {
-    alert(r.data.error || 'Erro ao salvar cliente');
-  }
+  const r = await criarDestinatario(
+    document.getElementById('novoClienteNome').value,
+    document.getElementById('novoClienteDoc').value,
+    document.getElementById('novoClienteUf').value,
+    document.getElementById('novoClienteCidade').value,
+    document.getElementById('novoClienteContribuinte').checked
+  );
+  if (r.ok) { selecionarDestinatario(r.data.destinatario); document.getElementById('novoClienteForm').hidden = true; }
+  else alert(r.data.error || 'Erro ao salvar cliente');
 }
 
-// ---------- Itens ----------
+// ---------- Itens (aba Emitir) ----------
 
 let buscaProdTimeout;
 function buscarProdutos() {
@@ -432,15 +602,13 @@ function buscarProdutos() {
   buscaProdTimeout = setTimeout(async () => {
     const r = await api('GET', '/estoque/produtos?busca=' + encodeURIComponent(termo));
     if (!r.ok) return;
-    if (r.data.produtos.length === 0) {
-      dropdown.innerHTML = '<div class="dropdown-item"><span class="sub">Nenhum produto encontrado</span></div>';
-    } else {
-      dropdown.innerHTML = r.data.produtos.map(p => `
+    dropdown.innerHTML = r.data.produtos.length === 0
+      ? '<div class="dropdown-item"><span class="sub">Nenhum produto encontrado</span></div>'
+      : r.data.produtos.map(p => `
         <div class="dropdown-item" onclick='adicionarItem(${JSON.stringify(p).replace(/'/g, "&apos;")})'>
           <div>${p.codigo} — ${p.descricao}</div>
           <div class="sub">Saldo: ${Number(p.quantidade).toFixed(0)} · R$ ${Number(p.precoVenda).toFixed(2)}</div>
         </div>`).join('');
-    }
     dropdown.hidden = false;
   }, 250);
 }
@@ -448,48 +616,26 @@ function buscarProdutos() {
 async function adicionarItem(produto) {
   document.getElementById('dropdownProduto').hidden = true;
   document.getElementById('buscaProduto').value = '';
-
-  const item = {
-    produto,
-    quantidade: 1,
-    valorUnitario: Number(produto.precoVenda) || 0,
-    cfop: '',
-    cfopDescricao: '',
-    avisos: []
-  };
+  const item = { produto, quantidade: 1, valorUnitario: Number(produto.precoVenda) || 0, cfop: '', cfopDescricao: '', avisos: [] };
   itens.push(item);
   renderizarItens();
   await atualizarSugestaoItem(item);
   renderizarItens();
 }
 
-function removerItem(idx) {
-  itens.splice(idx, 1);
-  renderizarItens();
-}
+function removerItem(idx) { itens.splice(idx, 1); renderizarItens(); }
 
 async function atualizarSugestaoItem(item) {
   if (!destinatarioSelecionado || !empresa?.uf) {
-    item.cfop = '';
-    item.cfopDescricao = 'selecione o destinatário e configure a UF da empresa';
-    return;
+    item.cfop = ''; item.cfopDescricao = 'selecione o destinatário e configure a UF da empresa'; return;
   }
   const r = await api('POST', '/fiscal/classificacao/sugerir', {
-    produtoId: item.produto.id,
-    tipoOperacao: 'venda',
-    ufOrigem: empresa.uf,
-    ufDestino: destinatarioSelecionado.uf
+    produtoId: item.produto.id, tipoOperacao: 'venda', ufOrigem: empresa.uf, ufDestino: destinatarioSelecionado.uf
   });
   if (r.ok) {
-    item.cfop = r.data.cfop;
-    item.cfopDescricao = r.data.cfopDescricao;
-    item.tabelaIcms = r.data.tabelaIcms;
-    item.codigoIcms = r.data.codigoIcms;
-    item.avisos = r.data.avisos || [];
-  } else {
-    item.cfop = '';
-    item.avisos = [r.data.error];
-  }
+    item.cfop = r.data.cfop; item.cfopDescricao = r.data.cfopDescricao;
+    item.tabelaIcms = r.data.tabelaIcms; item.codigoIcms = r.data.codigoIcms; item.avisos = r.data.avisos || [];
+  } else { item.cfop = ''; item.avisos = [r.data.error]; }
 }
 
 async function recalcularCfopDosItens() {
@@ -506,17 +652,15 @@ function renderizarItens() {
       <td><input type="number" min="0.001" step="0.001" value="${item.quantidade}" style="width:70px" onchange="itens[${idx}].quantidade=Number(this.value);renderizarItens()"></td>
       <td><input type="number" min="0" step="0.01" value="${item.valorUnitario}" style="width:80px" onchange="itens[${idx}].valorUnitario=Number(this.value);renderizarItens()"></td>
       <td>R$ ${(item.quantidade * item.valorUnitario).toFixed(2)}</td>
-      <td><button class="small danger" onclick="removerItem(${idx})">×</button></td>
-    </tr>
-  `).join('');
+      <td><button class="btn small danger" onclick="removerItem(${idx})">×</button></td>
+    </tr>`).join('');
 
   const avisos = [...new Set(itens.flatMap(i => i.avisos || []))];
   const existente = document.getElementById('avisosItens');
   if (existente) existente.remove();
   if (avisos.length) {
     const div = document.createElement('div');
-    div.id = 'avisosItens';
-    div.className = 'avisos';
+    div.id = 'avisosItens'; div.className = 'avisos';
     div.innerHTML = '<ul>' + avisos.map(a => `<li>${a}</li>`).join('') + '</ul>';
     document.getElementById('tabelaItens').after(div);
   }
@@ -531,31 +675,24 @@ function renderizarItens() {
 async function emitirNFe() {
   const resultadoEl = document.getElementById('resultadoEmissao');
   resultadoEl.innerHTML = '';
-
   if (!destinatarioSelecionado) return alert('Selecione ou cadastre um destinatário');
   if (itens.length === 0) return alert('Adicione ao menos um item');
 
   const btn = document.getElementById('btnEmitir');
-  btn.disabled = true;
-  btn.textContent = 'Emitindo...';
+  btn.disabled = true; btn.textContent = 'Emitindo...';
 
   const body = {
     destinatarioId: destinatarioSelecionado.id,
     naturezaOperacao: document.getElementById('naturezaOperacao').value,
     baixarEstoque: document.getElementById('baixarEstoque').checked,
     itens: itens.map(i => ({
-      produtoId: i.produto.id,
-      quantidade: i.quantidade,
-      valorUnitario: i.valorUnitario,
-      cfop: i.cfop || undefined,
-      tabelaIcms: i.tabelaIcms,
-      codigoIcms: i.codigoIcms
+      produtoId: i.produto.id, quantidade: i.quantidade, valorUnitario: i.valorUnitario,
+      cfop: i.cfop || undefined, tabelaIcms: i.tabelaIcms, codigoIcms: i.codigoIcms
     }))
   };
 
   const r = await api('POST', '/nfe/emitir', body);
-  btn.disabled = false;
-  btn.textContent = 'Emitir NF-e';
+  btn.disabled = false; btn.textContent = 'Emitir NF-e';
 
   if (r.ok) {
     resultadoEl.innerHTML = `
@@ -564,17 +701,14 @@ async function emitirNFe() {
         <div class="chave">Chave: ${r.data.nfe.chaveNFe}</div>
         ${r.data.avisos?.length ? '<div class="avisos" style="margin-top:8px"><ul>' + r.data.avisos.map(a => `<li>${a}</li>`).join('') + '</ul></div>' : ''}
       </div>`;
-    itens = [];
-    limparDestinatario();
-    renderizarItens();
-    carregarNFes();
+    itens = []; limparDestinatario(); renderizarItens(); carregarNFes();
   } else {
     resultadoEl.innerHTML = `<div class="resultado erro">❌ ${r.data.error}</div>`;
   }
 }
 
 async function carregarNFes() {
-  const r = await api('GET', '/nfe?limite=10');
+  const r = await api('GET', '/nfe?limite=10&direcao=emitida');
   if (!r.ok) return;
   document.getElementById('corpoNFes').innerHTML = r.data.nfes.map(nfe => `
     <tr>
@@ -584,8 +718,7 @@ async function carregarNFes() {
       <td><span class="pill">${nfe.statusSEFAZ}</span></td>
       <td>${new Date(nfe.dataEmissao).toLocaleString('pt-BR')}</td>
       <td><button class="link-btn" onclick="verXml('${nfe.id}')">ver XML</button></td>
-    </tr>
-  `).join('') || '<tr><td colspan="6" style="color:var(--muted)">Nenhuma NF-e emitida ainda</td></tr>';
+    </tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhuma NF-e emitida ainda</td></tr>';
 }
 
 async function verXml(nfeId) {
@@ -593,6 +726,126 @@ async function verXml(nfeId) {
   if (!r.ok) return alert(r.data.error || 'Erro ao obter XML');
   const janela = window.open('', '_blank');
   janela.document.write('<pre style="white-space:pre-wrap;font-family:monospace;padding:16px">' + r.data.xml.replace(/</g, '&lt;') + '</pre>');
+}
+
+// ---------- Buscar NF-e (entrada) ----------
+
+function lerArquivoXml(event) {
+  const arquivo = event.target.files[0];
+  if (!arquivo) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('xmlColado').value = e.target.result;
+    document.getElementById('dropzoneXml').textContent = '📄 ' + arquivo.name + ' carregado';
+  };
+  reader.readAsText(arquivo);
+}
+
+async function reconhecerNFeEntrada() {
+  const xmlContent = document.getElementById('xmlColado').value.trim();
+  const resultadoEl = document.getElementById('resultadoEntrada');
+  resultadoEl.innerHTML = '';
+  if (!xmlContent) return alert('Escolha um arquivo .xml ou cole o conteúdo');
+
+  const btn = document.getElementById('btnReconhecer');
+  btn.disabled = true; btn.textContent = 'Reconhecendo...';
+
+  const r = await api('POST', '/fiscal/tributacao/importar-nfe-compra', { xmlContent });
+  btn.disabled = false; btn.textContent = 'Reconhecer NF-e';
+
+  if (!r.ok) {
+    resultadoEl.innerHTML = `<div class="resultado erro">❌ ${r.data.error}</div>`;
+    return;
+  }
+
+  const linhaProduto = (p, tag) => `
+    <tr><td>${p.codigo}</td><td>${p.descricao}</td><td><span class="pill ${tag === 'novo' ? 'ok' : ''}">${tag}</span></td><td>${Number(p.quantidade).toFixed(0)}</td><td>R$ ${Number(p.precoMedioCusto).toFixed(2)}</td></tr>`;
+
+  resultadoEl.innerHTML = `
+    <div class="resultado sucesso">
+      <strong>✅ NF-e reconhecida</strong> — fornecedor: ${r.data.emitente.nome} (${r.data.emitente.cnpj}) · ${r.data.totalItens} item(ns)
+      <table>
+        <thead><tr><th>Código</th><th>Descrição</th><th></th><th>Saldo atual</th><th>Custo médio</th></tr></thead>
+        <tbody>
+          ${r.data.produtosCriados.map(p => linhaProduto(p, 'novo')).join('')}
+          ${r.data.produtosAtualizados.map(p => linhaProduto(p, 'atualizado')).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('xmlColado').value = '';
+  document.getElementById('arquivoXml').value = '';
+  document.getElementById('dropzoneXml').textContent = '📄 Clique para escolher um arquivo .xml — ou cole o conteúdo abaixo';
+  carregarNotasRecebidas();
+}
+
+async function carregarNotasRecebidas() {
+  const r = await api('GET', '/nfe?limite=10&direcao=recebida');
+  if (!r.ok) return;
+  document.getElementById('corpoNotasRecebidas').innerHTML = r.data.nfes.map(nfe => `
+    <tr>
+      <td>${nfe.nomeCliente || '—'}</td>
+      <td>R$ ${Number(nfe.valor || 0).toFixed(2)}</td>
+      <td>${new Date(nfe.dataEmissao).toLocaleString('pt-BR')}</td>
+      <td><button class="link-btn" onclick="verXml('${nfe.id}')">ver XML</button></td>
+    </tr>`).join('') || '<tr><td colspan="4" class="empty">Nenhuma nota de compra reconhecida ainda</td></tr>';
+}
+
+// ---------- Clientes (aba própria) ----------
+
+function toggleNovoClienteTab() {
+  document.getElementById('novoClienteTabForm').hidden = !document.getElementById('novoClienteTabForm').hidden;
+}
+
+async function salvarClienteTab() {
+  const r = await criarDestinatario(
+    document.getElementById('ctNome').value,
+    document.getElementById('ctDoc').value,
+    document.getElementById('ctUf').value,
+    document.getElementById('ctCidade').value,
+    false
+  );
+  if (r.ok) { document.getElementById('novoClienteTabForm').hidden = true; carregarClientes(); }
+  else alert(r.data.error || 'Erro ao salvar cliente');
+}
+
+async function carregarClientes() {
+  const r = await api('GET', '/destinatarios?limite=50');
+  if (!r.ok) return;
+  document.getElementById('corpoClientes').innerHTML = r.data.destinatarios.map(d => `
+    <tr><td>${d.nome}</td><td>${d.cpfCnpj}</td><td>${d.uf}</td><td>${d.contribuinteIcms ? 'sim' : 'não'}</td></tr>
+  `).join('') || '<tr><td colspan="4" class="empty">Nenhum cliente cadastrado ainda</td></tr>';
+}
+
+// ---------- Produtos (aba própria) ----------
+
+function toggleNovoProduto() {
+  document.getElementById('novoProdutoForm').hidden = !document.getElementById('novoProdutoForm').hidden;
+}
+
+async function salvarProdutoTab() {
+  const body = {
+    codigo: document.getElementById('ptCodigo').value,
+    descricao: document.getElementById('ptDescricao').value,
+    finalidade: document.getElementById('ptFinalidade').value,
+    ncm: document.getElementById('ptNcm').value,
+    quantidade: Number(document.getElementById('ptQuantidade').value),
+    precoCusto: Number(document.getElementById('ptPrecoCusto').value),
+    precoVenda: Number(document.getElementById('ptPrecoVenda').value)
+  };
+  const r = await api('POST', '/estoque/produtos', body);
+  if (r.ok) { document.getElementById('novoProdutoForm').hidden = true; carregarProdutosTab(); }
+  else alert(r.data.error || 'Erro ao salvar produto');
+}
+
+async function carregarProdutosTab() {
+  const r = await api('GET', '/estoque/produtos?limite=50');
+  if (!r.ok) return;
+  document.getElementById('corpoProdutos').innerHTML = r.data.produtos.map(p => `
+    <tr>
+      <td>${p.codigo}</td><td>${p.descricao}</td><td><span class="pill">${p.finalidade}</span></td>
+      <td>${Number(p.quantidade).toFixed(0)}</td><td>R$ ${Number(p.precoMedioCusto).toFixed(2)}</td><td>R$ ${Number(p.precoVenda).toFixed(2)}</td>
+    </tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhum produto cadastrado ainda</td></tr>';
 }
 
 document.addEventListener('click', (e) => {

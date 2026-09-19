@@ -27,6 +27,13 @@ const NFe = sequelize.define('NFe', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  direcao: {
+    // 'emitida': nota de venda que a própria empresa emitiu (entra nos totais fiscais/EFD)
+    // 'recebida': nota de compra de um fornecedor, importada para reconhecer produtos/estoque
+    type: DataTypes.ENUM('emitida', 'recebida'),
+    allowNull: false,
+    defaultValue: 'emitida'
+  },
   chaveNFe: {
     type: DataTypes.STRING(44),
     allowNull: false,

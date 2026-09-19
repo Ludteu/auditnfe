@@ -4,6 +4,35 @@ const NFe = require('../models/NFe');
 const { Op } = require('sequelize');
 
 /**
+ * Extrai o cabeçalho de um XML de NF-e: chave, número/série, data de
+ * emissão e dados do emitente (usado ao importar uma nota de compra
+ * recebida de um fornecedor).
+ */
+const extrairCabecalho = async (xmlContent) => {
+  const obj = await xmlParaObjeto(xmlContent);
+  const nfe = obj?.NFe?.infNfe?.[0];
+
+  if (!nfe) {
+    throw new Error('XML inválido: estrutura NF-e não encontrada');
+  }
+
+  const ide = nfe.ide?.[0] || {};
+  const emit = nfe.emit?.[0] || {};
+  const chaveNFe = nfe.$?.Id?.replace('NFe', '') || null;
+
+  return {
+    chaveNFe,
+    numero: ide.nNF?.[0] ? parseInt(ide.nNF[0], 10) : null,
+    serie: ide.serie?.[0] ? parseInt(ide.serie[0], 10) : 1,
+    dataEmissao: ide.dhEmi?.[0] || null,
+    naturezaOperacao: ide.natOp?.[0] || null,
+    emitenteCnpj: emit.CNPJ?.[0] || null,
+    emitenteNome: emit.xNome?.[0] || null,
+    emitenteUf: emit.enderEmit?.[0]?.UF?.[0] || null
+  };
+};
+
+/**
  * Extrai dados tributários (NCM, CFOP, ICMS, IPI) de cada item de um XML de NF-e
  */
 const extrairTributacao = async (xmlContent) => {
@@ -81,7 +110,10 @@ const aplicarTributacaoProduto = async (usuarioId, produtoId, dados) => {
  * Resumo fiscal do período: soma de ICMS/IPI declarados nos XMLs das NF-es emitidas
  */
 const calcularResumoFiscal = async (usuarioId, { dataInicio, dataFim } = {}) => {
-  const where = { usuarioId };
+  // Só notas emitidas (vendas) entram no resumo fiscal — notas recebidas
+  // (compras importadas via reconhecimento de produtos) ainda não são
+  // incluídas aqui nem no EFD; ver limitação documentada em EMISSAO.md.
+  const where = { usuarioId, direcao: 'emitida' };
 
   if (dataInicio || dataFim) {
     where.dataEmissao = {};
@@ -127,6 +159,7 @@ const calcularResumoFiscal = async (usuarioId, { dataInicio, dataFim } = {}) => 
 };
 
 module.exports = {
+  extrairCabecalho,
   extrairTributacao,
   aplicarTributacaoProduto,
   calcularResumoFiscal

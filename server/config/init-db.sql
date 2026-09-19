@@ -11,6 +11,13 @@ CREATE TABLE IF NOT EXISTS usuarios (
   razaoSocial VARCHAR,
   regimeTributario VARCHAR(20),
   uf VARCHAR(2),
+  nomeFantasia VARCHAR,
+  cidade VARCHAR,
+  cep VARCHAR(8),
+  logradouro VARCHAR,
+  numero VARCHAR,
+  bairro VARCHAR,
+  telefone VARCHAR,
   ativo BOOLEAN DEFAULT true,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -71,6 +78,7 @@ CREATE TABLE IF NOT EXISTS nfes (
   usuarioId UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
   destinatarioId UUID REFERENCES destinatarios(id),
   naturezaOperacao VARCHAR,
+  direcao VARCHAR(10) NOT NULL DEFAULT 'emitida',
   chaveNFe VARCHAR(44) UNIQUE NOT NULL,
   cnpj VARCHAR(14) NOT NULL,
   numero INTEGER NOT NULL,
@@ -98,8 +106,11 @@ CREATE INDEX IF NOT EXISTS idx_nfes_chave_cnpj ON nfes(chaveNFe, cnpj);
 CREATE INDEX IF NOT EXISTS idx_nfes_cnpj_data ON nfes(cnpj, dataEmissao);
 
 -- Constraints adicionais
-ALTER TABLE nfes ADD CONSTRAINT chk_status_nfe 
+ALTER TABLE nfes ADD CONSTRAINT chk_status_nfe
   CHECK (statusSEFAZ IN ('pendente', 'enviada', 'autorizada', 'rejeitada', 'cancelada'));
+
+ALTER TABLE nfes ADD CONSTRAINT chk_direcao_nfe
+  CHECK (direcao IN ('emitida', 'recebida'));
 
 -- Tabela de produtos
 CREATE TABLE IF NOT EXISTS produtos (

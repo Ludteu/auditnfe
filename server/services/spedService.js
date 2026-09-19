@@ -18,6 +18,7 @@ const gerarArquivoEFD = async (usuarioId, { dataInicio, dataFim, cnpj, razaoSoci
 
   const where = {
     usuarioId,
+    direcao: 'emitida', // notas recebidas (compras) ainda não entram no EFD — ver EMISSAO.md
     dataEmissao: {
       [Op.gte]: new Date(dataInicio),
       [Op.lte]: new Date(dataFim)

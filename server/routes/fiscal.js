@@ -12,6 +12,11 @@ router.use(autenticacao);
 router.post('/classificacao/sugerir', tributacaoController.sugerirClassificacao);
 
 /**
+ * Importação de NF-e de compra (reconhecimento automático de produtos)
+ */
+router.post('/tributacao/importar-nfe-compra', tributacaoController.importarNotaCompra);
+
+/**
  * Tributação
  */
 router.post('/tributacao/extrair', tributacaoController.extrair);
