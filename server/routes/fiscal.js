@@ -37,4 +37,10 @@ router.get('/tributacao/resumo', tributacaoController.resumo);
 router.post('/sped/efd', tributacaoController.gerarEfd);
 router.get('/sped/efd/download', tributacaoController.downloadEfd);
 
+/**
+ * Reforma Tributária (IBS/CBS) — ver reformaTributariaService.js
+ */
+router.get('/reforma/segmentos', tributacaoController.listarSegmentosReforma);
+router.post('/reforma/calcular', tributacaoController.calcularReforma);
+
 module.exports = router;

@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
+const { SEGMENTOS_VALIDOS } = require('../services/reformaTributariaService');
 
 const Produto = sequelize.define('Produto', {
   id: {
@@ -31,6 +32,12 @@ const Produto = sequelize.define('Produto', {
     type: DataTypes.ENUM('revenda', 'producao_propria', 'materia_prima_insumo', 'uso_consumo', 'ativo_imobilizado'),
     allowNull: false,
     defaultValue: 'revenda'
+  },
+  segmentoTributario: {
+    // Override por item do segmento da Reforma Tributária (IBS/CBS).
+    // null = usa o segmento padrão cadastrado na empresa.
+    type: DataTypes.ENUM(...SEGMENTOS_VALIDOS),
+    allowNull: true
   },
   quantidade: {
     type: DataTypes.DECIMAL(15, 3),

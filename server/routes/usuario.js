@@ -6,6 +6,7 @@ const autenticacao = require('../middleware/autenticacao');
 const Usuario = require('../models/Usuario');
 const Certificado = require('../models/Certificado');
 const { consultarCnpj } = require('../services/cnpjLookupService');
+const { SEGMENTOS_VALIDOS } = require('../services/reformaTributariaService');
 
 const router = express.Router();
 
@@ -63,7 +64,7 @@ router.get('/perfil', async (req, res) => {
  */
 router.put('/perfil', async (req, res) => {
   try {
-    const { nome, razaoSocial, regimeTributario, uf, nomeFantasia, cidade, cep, logradouro, numero, bairro, telefone } = req.body;
+    const { nome, razaoSocial, regimeTributario, uf, nomeFantasia, cidade, cep, logradouro, numero, bairro, telefone, segmentoTributario, aliquotaIbsTeste, aliquotaCbsTeste } = req.body;
     const usuario = await Usuario.findByPk(req.usuario.id);
 
     if (!usuario) {
@@ -88,6 +89,15 @@ router.put('/perfil', async (req, res) => {
     if (numero !== undefined) usuario.numero = numero;
     if (bairro !== undefined) usuario.bairro = bairro;
     if (telefone !== undefined) usuario.telefone = telefone;
+
+    if (segmentoTributario !== undefined) {
+      if (!SEGMENTOS_VALIDOS.includes(segmentoTributario)) {
+        return res.status(400).json({ error: `segmentoTributario deve ser um de: ${SEGMENTOS_VALIDOS.join(', ')}` });
+      }
+      usuario.segmentoTributario = segmentoTributario;
+    }
+    if (aliquotaIbsTeste !== undefined) usuario.aliquotaIbsTeste = aliquotaIbsTeste;
+    if (aliquotaCbsTeste !== undefined) usuario.aliquotaCbsTeste = aliquotaCbsTeste;
 
     await usuario.save();
 

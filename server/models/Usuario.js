@@ -1,6 +1,7 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const bcrypt = require('bcryptjs');
+const { SEGMENTOS_VALIDOS, ALIQUOTA_IBS_TESTE_2026, ALIQUOTA_CBS_TESTE_2026 } = require('../services/reformaTributariaService');
 
 const Usuario = sequelize.define('Usuario', {
   id: {
@@ -68,6 +69,23 @@ const Usuario = sequelize.define('Usuario', {
   telefone: {
     type: DataTypes.STRING,
     allowNull: true
+  },
+  segmentoTributario: {
+    // Segmento padrão da empresa para a Reforma Tributária (IBS/CBS) —
+    // ver reformaTributariaService.js. Serve de default para produtos novos.
+    type: DataTypes.ENUM(...SEGMENTOS_VALIDOS),
+    allowNull: false,
+    defaultValue: 'padrao'
+  },
+  aliquotaIbsTeste: {
+    type: DataTypes.DECIMAL(5, 3),
+    allowNull: false,
+    defaultValue: ALIQUOTA_IBS_TESTE_2026
+  },
+  aliquotaCbsTeste: {
+    type: DataTypes.DECIMAL(5, 3),
+    allowNull: false,
+    defaultValue: ALIQUOTA_CBS_TESTE_2026
   },
   ativo: {
     type: DataTypes.BOOLEAN,

@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
   numero VARCHAR,
   bairro VARCHAR,
   telefone VARCHAR,
+  segmentoTributario VARCHAR(30) NOT NULL DEFAULT 'padrao',
+  aliquotaIbsTeste DECIMAL(5, 3) NOT NULL DEFAULT 0.1,
+  aliquotaCbsTeste DECIMAL(5, 3) NOT NULL DEFAULT 0.9,
   ativo BOOLEAN DEFAULT true,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -30,6 +33,16 @@ CREATE INDEX IF NOT EXISTS idx_usuarios_ativo ON usuarios(ativo);
 
 ALTER TABLE usuarios ADD CONSTRAINT chk_regime_tributario
   CHECK (regimeTributario IS NULL OR regimeTributario IN ('simples_nacional', 'lucro_presumido', 'lucro_real'));
+
+-- Segmentos da Reforma Tributária (IBS/CBS) — ver reformaTributariaService.js
+ALTER TABLE usuarios ADD CONSTRAINT chk_segmento_tributario_usuario
+  CHECK (segmentoTributario IN (
+    'padrao', 'profissoes_intelectuais', 'bares_restaurantes', 'hotelaria_parques',
+    'transporte_coletivo', 'transporte_aereo_regional', 'agencias_turismo',
+    'operacoes_imobiliarias', 'educacao', 'saude_humana', 'dispositivos_medicos',
+    'medicamentos_nao_essenciais', 'higiene_limpeza', 'produtos_agropecuarios',
+    'locacao_imoveis', 'cesta_basica_pcd'
+  ));
 
 -- Tabela de certificados
 CREATE TABLE IF NOT EXISTS certificados (
@@ -120,6 +133,7 @@ CREATE TABLE IF NOT EXISTS produtos (
   descricao VARCHAR NOT NULL,
   unidade VARCHAR(6) DEFAULT 'UN',
   finalidade VARCHAR(25) NOT NULL DEFAULT 'revenda',
+  segmentoTributario VARCHAR(30),
   quantidade DECIMAL(15, 3) NOT NULL DEFAULT 0,
   estoqueMinimo DECIMAL(15, 3) NOT NULL DEFAULT 0,
   precoCusto DECIMAL(15, 4) DEFAULT 0,
@@ -144,6 +158,15 @@ CREATE INDEX IF NOT EXISTS idx_produtos_ncm ON produtos(ncm);
 
 ALTER TABLE produtos ADD CONSTRAINT chk_finalidade_produto
   CHECK (finalidade IN ('revenda', 'producao_propria', 'materia_prima_insumo', 'uso_consumo', 'ativo_imobilizado'));
+
+ALTER TABLE produtos ADD CONSTRAINT chk_segmento_tributario_produto
+  CHECK (segmentoTributario IS NULL OR segmentoTributario IN (
+    'padrao', 'profissoes_intelectuais', 'bares_restaurantes', 'hotelaria_parques',
+    'transporte_coletivo', 'transporte_aereo_regional', 'agencias_turismo',
+    'operacoes_imobiliarias', 'educacao', 'saude_humana', 'dispositivos_medicos',
+    'medicamentos_nao_essenciais', 'higiene_limpeza', 'produtos_agropecuarios',
+    'locacao_imoveis', 'cesta_basica_pcd'
+  ));
 
 -- Tabela de movimentações de estoque
 CREATE TABLE IF NOT EXISTS movimentacoes_estoque (

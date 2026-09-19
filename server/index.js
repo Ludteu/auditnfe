@@ -11,6 +11,7 @@ const usuarioRoutes = require('./routes/usuario');
 const estoqueRoutes = require('./routes/estoque');
 const fiscalRoutes = require('./routes/fiscal');
 const destinatarioRoutes = require('./routes/destinatario');
+const atualizacoesRoutes = require('./routes/atualizacoes');
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/nfe', nfeRoutes);
 app.use('/api/estoque', estoqueRoutes);
 app.use('/api/fiscal', fiscalRoutes);
 app.use('/api/destinatarios', destinatarioRoutes);
+app.use('/api/atualizacoes', atualizacoesRoutes);
 
 // Rota de health check
 app.get('/api/health', (req, res) => {

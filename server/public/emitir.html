@@ -164,6 +164,13 @@
   }
   .dropzone:hover { border-color: var(--accent); color: var(--text); }
   .empty { color: var(--muted); font-size: 12.5px; padding: 10px 0; }
+  .timeline-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .timeline-item:last-child { border-bottom: none; }
+  .timeline-item .data { font-size: 11px; color: var(--accent); font-weight: 600; }
+  .timeline-item .titulo { font-size: 13.5px; font-weight: 600; margin: 2px 0 4px; }
+  .timeline-item .descricao { font-size: 12.5px; color: var(--muted); }
+  .timeline-item ul { margin: 4px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--muted); }
+  .link-list a { display: block; padding: 7px 0; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -198,6 +205,7 @@
     <button data-tab="clientes" onclick="showTab('clientes')">👥 Clientes</button>
     <button data-tab="produtos" onclick="showTab('produtos')">📦 Produtos</button>
     <button data-tab="empresa" onclick="showTab('empresa')">🏢 Minha empresa</button>
+    <button data-tab="atualizacoes" onclick="showTab('atualizacoes')">📰 Atualizações</button>
   </nav>
 
   <main class="content">
@@ -377,6 +385,8 @@
             </div>
             <div><label>NCM</label><input id="ptNcm"></div>
           </div>
+          <label>Segmento (Reforma Tributária — IBS/CBS)</label>
+          <select id="ptSegmento"></select>
           <div class="row">
             <div><label>Qtd inicial</label><input id="ptQuantidade" value="0"></div>
             <div><label>Preço custo</label><input id="ptPrecoCusto" value="0"></div>
@@ -435,6 +445,28 @@
       </div>
 
       <div class="card">
+        <h2>🧾 Reforma Tributária (IBS/CBS)</h2>
+        <p class="hint">Segmento padrão da empresa para calcular a base reduzida de IBS/CBS (Anexos da LC 214/2025). Serve de default para produtos novos — cada produto pode ter o próprio segmento em "Produtos". Ver detalhes e limitações na aba <a href="#" onclick="showTab('atualizacoes');return false">Atualizações</a>.</p>
+
+        <label>Segmento padrão</label>
+        <select id="empSegmento"></select>
+
+        <div class="row">
+          <div><label>Alíquota IBS de teste (%)</label><input type="number" step="0.001" id="empAliquotaIbs"></div>
+          <div><label>Alíquota CBS de teste (%)</label><input type="number" step="0.001" id="empAliquotaCbs"></div>
+        </div>
+
+        <div class="card" style="background:var(--panel-2);margin-top:12px">
+          <h2 style="font-size:13px">Simulação rápida</h2>
+          <div class="row">
+            <div><label>Valor da operação (R$)</label><input type="number" step="0.01" id="simValorOperacao" value="1000"></div>
+            <button class="btn secondary" style="flex:0 0 auto;margin-top:22px" onclick="simularReforma()">Calcular</button>
+          </div>
+          <div id="resultadoSimulacao"></div>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>🔐 Certificado digital</h2>
         <p class="hint">Necessário para assinar NF-es e para buscar notas direto na SEFAZ. Aceita arquivos .pfx ou .p12 (padrão A1). A senha do certificado não é salva aqui — ela vem da variável de ambiente <code>CERT_PASSWORD</code> no <code>.env</code> do servidor.</p>
 
@@ -453,6 +485,29 @@
           <thead><tr><th>Descrição</th><th>CNPJ</th><th>Válido até</th><th>Status</th><th></th></tr></thead>
           <tbody id="corpoCertificados"></tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- ===================== ATUALIZAÇÕES ===================== -->
+    <section class="tab-panel" id="tab-atualizacoes">
+      <div class="card">
+        <h2>📰 Atualizações</h2>
+        <p class="hint">O changelog abaixo é gerado a partir do histórico real de mudanças deste sistema. A linha do tempo da Reforma Tributária é conteúdo de referência mantido manualmente — <strong>não é uma busca ao vivo no portal da NF-e</strong>: testamos e o portal oficial bloqueia esse tipo de acesso automatizado. Use os links oficiais abaixo para conferir a fonte primária.</p>
+      </div>
+
+      <div class="card">
+        <h2>Fontes oficiais</h2>
+        <div id="corpoLinksOficiais"></div>
+      </div>
+
+      <div class="card">
+        <h2>Linha do tempo — Reforma Tributária (IBS/CBS)</h2>
+        <div id="corpoMarcosReforma"></div>
+      </div>
+
+      <div class="card">
+        <h2>Changelog deste sistema</h2>
+        <div id="corpoChangelog"></div>
       </div>
     </section>
 
@@ -501,6 +556,30 @@ function showTab(name) {
   if (name === 'produtos') carregarProdutosTab();
   if (name === 'entrada') carregarNotasRecebidas();
   if (name === 'empresa') carregarCertificados();
+  if (name === 'atualizacoes') carregarAtualizacoes();
+}
+
+async function carregarAtualizacoes() {
+  const r = await api('GET', '/atualizacoes');
+  if (!r.ok) return;
+
+  document.getElementById('corpoLinksOficiais').innerHTML = `<div class="link-list">${
+    r.data.linksOficiais.map(l => `<a href="${l.url}" target="_blank" rel="noopener">🔗 ${l.titulo}</a>`).join('')
+  }</div>`;
+
+  document.getElementById('corpoMarcosReforma').innerHTML = r.data.marcosReformaTributaria.map(m => `
+    <div class="timeline-item">
+      <div class="data">${new Date(m.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</div>
+      <div class="titulo">${m.titulo}</div>
+      <div class="descricao">${m.descricao}</div>
+    </div>`).join('');
+
+  document.getElementById('corpoChangelog').innerHTML = r.data.changelogSistema.map(c => `
+    <div class="timeline-item">
+      <div class="data">${new Date(c.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</div>
+      <div class="titulo">${c.titulo}</div>
+      <ul>${c.itens.map(i => `<li>${i}</li>`).join('')}</ul>
+    </div>`).join('');
 }
 
 async function registrar() {
@@ -538,7 +617,22 @@ async function onLogin(data) {
   showTab('emitir');
 }
 
+let segmentosReforma = [];
+
+async function carregarSegmentosReforma() {
+  if (segmentosReforma.length) return segmentosReforma;
+  const r = await api('GET', '/fiscal/reforma/segmentos');
+  if (!r.ok) return [];
+  segmentosReforma = r.data.segmentos;
+  const opcoes = segmentosReforma.map(s => `<option value="${s.chave}">${s.descricao} (-${s.percentualReducao}%)</option>`).join('');
+  document.getElementById('empSegmento').innerHTML = opcoes;
+  const ptSegmentoEl = document.getElementById('ptSegmento');
+  if (ptSegmentoEl) ptSegmentoEl.innerHTML = '<option value="">— usa o da empresa —</option>' + opcoes;
+  return segmentosReforma;
+}
+
 async function carregarPerfil() {
+  await carregarSegmentosReforma();
   const r = await api('GET', '/usuarios/perfil');
   if (!r.ok) return;
   empresa = r.data;
@@ -554,8 +648,29 @@ async function carregarPerfil() {
   document.getElementById('empNumero').value = empresa.numero || '';
   document.getElementById('empBairro').value = empresa.bairro || '';
   document.getElementById('empTelefone').value = empresa.telefone || '';
+  document.getElementById('empSegmento').value = empresa.segmentoTributario || 'padrao';
+  document.getElementById('empAliquotaIbs').value = empresa.aliquotaIbsTeste;
+  document.getElementById('empAliquotaCbs').value = empresa.aliquotaCbsTeste;
   document.getElementById('certCnpj').value = empresa.cnpj;
   atualizarBadgeEmpresa();
+}
+
+async function simularReforma() {
+  const resultadoEl = document.getElementById('resultadoSimulacao');
+  const r = await api('POST', '/fiscal/reforma/calcular', {
+    valorOperacao: Number(document.getElementById('simValorOperacao').value),
+    segmento: document.getElementById('empSegmento').value,
+    aliquotaIbs: Number(document.getElementById('empAliquotaIbs').value),
+    aliquotaCbs: Number(document.getElementById('empAliquotaCbs').value)
+  });
+  if (!r.ok) { resultadoEl.innerHTML = `<div class="resultado erro">❌ ${r.data.error}</div>`; return; }
+  const d = r.data;
+  resultadoEl.innerHTML = `
+    <div class="totais" style="margin-top:10px">
+      <div class="item"><div class="v">R$ ${d.baseCalculoReduzida.toFixed(2)}</div><div class="k">base reduzida (-${d.percentualReducao}%)</div></div>
+      <div class="item"><div class="v">R$ ${d.valorIbs.toFixed(2)}</div><div class="k">IBS</div></div>
+      <div class="item"><div class="v">R$ ${d.valorCbs.toFixed(2)}</div><div class="k">CBS</div></div>
+    </div>`;
 }
 
 async function enviarCertificado() {
@@ -598,7 +713,7 @@ async function carregarCertificados() {
       <tr>
         <td>${c.descricao || '—'}</td>
         <td>${c.cnpj}</td>
-        <td>${new Date(c.validoAte).toLocaleDateString('pt-BR')} ${vencido ? '<span class="pill err">vencido</span>' : ''}</td>
+        <td>${new Date(c.validoAte).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} ${vencido ? '<span class="pill err">vencido</span>' : ''}</td>
         <td><span class="pill ${c.ativo ? 'ok' : ''}">${c.ativo ? 'ativo' : 'inativo'}</span></td>
         <td>${!c.ativo ? `<button class="link-btn" onclick="ativarCertificado('${c.id}')">ativar</button>` : ''}</td>
       </tr>`;
@@ -660,7 +775,10 @@ async function salvarEmpresa() {
     logradouro: document.getElementById('empLogradouro').value,
     numero: document.getElementById('empNumero').value,
     bairro: document.getElementById('empBairro').value,
-    telefone: document.getElementById('empTelefone').value
+    telefone: document.getElementById('empTelefone').value,
+    segmentoTributario: document.getElementById('empSegmento').value,
+    aliquotaIbsTeste: Number(document.getElementById('empAliquotaIbs').value),
+    aliquotaCbsTeste: Number(document.getElementById('empAliquotaCbs').value)
   };
   const r = await api('PUT', '/usuarios/perfil', body);
   if (r.ok) { empresa = r.data.usuario; atualizarBadgeEmpresa(); }
@@ -1003,6 +1121,7 @@ async function salvarProdutoTab() {
     codigo: document.getElementById('ptCodigo').value,
     descricao: document.getElementById('ptDescricao').value,
     finalidade: document.getElementById('ptFinalidade').value,
+    segmentoTributario: document.getElementById('ptSegmento').value || null,
     ncm: document.getElementById('ptNcm').value,
     quantidade: Number(document.getElementById('ptQuantidade').value),
     precoCusto: Number(document.getElementById('ptPrecoCusto').value),

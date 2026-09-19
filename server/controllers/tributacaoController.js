@@ -6,6 +6,7 @@ const sequelize = require('../config/database');
 const tributacaoService = require('../services/tributacaoService');
 const spedService = require('../services/spedService');
 const fiscalRulesService = require('../services/fiscalRulesService');
+const reformaTributariaService = require('../services/reformaTributariaService');
 const estoqueService = require('../services/estoqueService');
 const sefazDistribuicaoService = require('../services/sefazDistribuicaoService');
 const { validarXmlBasico } = require('../utils/xmlHelper');
@@ -298,6 +299,51 @@ const buscarNaSefaz = async (req, res) => {
   }
 };
 
+/**
+ * Lista os segmentos da Reforma Tributária e seus percentuais de redução
+ * de base de cálculo (IBS/CBS). Informativo — sem efeito colateral.
+ */
+const listarSegmentosReforma = (req, res) => {
+  const segmentos = Object.entries(reformaTributariaService.SEGMENTOS_REFORMA).map(([chave, dados]) => ({
+    chave,
+    ...dados
+  }));
+  res.json({ segmentos });
+};
+
+/**
+ * Calcula a base reduzida e os valores de IBS/CBS de uma operação, a
+ * partir do segmento do produto (ou informado direto) e das alíquotas
+ * de teste configuradas no perfil da empresa (ou informadas direto).
+ */
+const calcularReforma = async (req, res) => {
+  try {
+    const { valorOperacao, produtoId, aliquotaIbs, aliquotaCbs } = req.body;
+    let { segmento } = req.body;
+
+    const usuario = await Usuario.findByPk(req.usuario.id);
+
+    if (produtoId) {
+      const produto = await Produto.findOne({ where: { id: produtoId, usuarioId: req.usuario.id } });
+      if (!produto) return res.status(404).json({ error: 'Produto não encontrado' });
+      segmento = segmento || produto.segmentoTributario || usuario.segmentoTributario;
+    } else {
+      segmento = segmento || usuario.segmentoTributario;
+    }
+
+    const resultado = reformaTributariaService.calcularIbsCbs({
+      valorOperacao,
+      segmento,
+      aliquotaIbs: aliquotaIbs != null ? aliquotaIbs : usuario.aliquotaIbsTeste,
+      aliquotaCbs: aliquotaCbs != null ? aliquotaCbs : usuario.aliquotaCbsTeste
+    });
+
+    res.json(resultado);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 module.exports = {
   extrair,
   preencherProduto,
@@ -305,6 +351,8 @@ module.exports = {
   resumo,
   gerarEfd,
   downloadEfd,
+  listarSegmentosReforma,
+  calcularReforma,
   sugerirClassificacao,
   importarNotaCompra,
   buscarNaSefaz
