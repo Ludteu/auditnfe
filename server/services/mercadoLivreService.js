@@ -108,6 +108,37 @@ const buscarPedidos = async (accessToken, sellerId, desde) => {
 };
 
 /**
+ * ⚠️ MAIOR INCERTEZA DESTA INTEGRAÇÃO: fecha o ciclo avisando o Mercado
+ * Livre qual nota fiscal corresponde ao pedido, para o comprador conseguir
+ * ver/baixar a NF-e pela própria área de compras dele. Diferente do OAuth
+ * e da busca de pedidos (endpoints centrais, bem documentados e estáveis),
+ * o endpoint exato de anexar nota fiscal ao envio é uma parte do catálogo
+ * de APIs do ML que muda mais e tem menos documentação pública — o
+ * caminho abaixo (anexar à Shipment) é o mais plausível pela documentação
+ * disponível, mas PRECISA ser confirmado contra um pedido real assim que
+ * houver credenciais, antes de confiar nisso silenciosamente. Por isso o
+ * chamador (marketplaceController) trata isso como best-effort: se falhar,
+ * a NF-e já emitida continua válida, só fica marcada como "não informada
+ * ao Mercado Livre" para nova tentativa manual.
+ */
+const informarNotaFiscal = async (accessToken, { shippingId, chaveNFe, numero, serie, dataEmissao }) => {
+  if (!shippingId) {
+    throw new Error('Pedido sem shipping_id — o Mercado Livre não fornece um envio para anexar a nota fiscal (ex: retirada em loja ou combinado fora da plataforma)');
+  }
+
+  await axios.post(`${API_BASE}/shipments/${shippingId}/invoices`, {
+    invoice_number: numero,
+    invoice_series: serie,
+    invoice_key: chaveNFe,
+    invoice_date: dataEmissao
+  }, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+
+  return true;
+};
+
+/**
  * Converte um pedido do Mercado Livre para o formato interno usado por
  * PedidoMarketplace.itens. O nome do campo de SKU varia entre integrações
  * ML — tenta as duas formas conhecidas antes de cair no id do anúncio.
@@ -138,5 +169,6 @@ module.exports = {
   buscarDadosVendedor,
   buscarPedidos,
   mapearItensPedido,
-  mapearComprador
+  mapearComprador,
+  informarNotaFiscal
 };

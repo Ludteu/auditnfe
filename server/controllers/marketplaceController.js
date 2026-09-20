@@ -1,6 +1,7 @@
 const ContaMarketplace = require('../models/ContaMarketplace');
 const PedidoMarketplace = require('../models/PedidoMarketplace');
 const Produto = require('../models/Produto');
+const NFe = require('../models/NFe');
 const mercadoLivreService = require('../services/mercadoLivreService');
 const emissaoService = require('../services/emissaoService');
 
@@ -105,6 +106,7 @@ const sincronizarMercadoLivre = async (req, res) => {
           plataforma: 'mercado_livre',
           pedidoExternoId: String(pedidoMl.id),
           dataPedido: pedidoMl.date_created,
+          shippingIdExterno: pedidoMl.shipping?.id ? String(pedidoMl.shipping.id) : null,
           comprador: mercadoLivreService.mapearComprador(pedidoMl),
           itens: mercadoLivreService.mapearItensPedido(pedidoMl),
           valorTotal: pedidoMl.total_amount,
@@ -192,7 +194,61 @@ const emitirNfeDoPedido = async (req, res) => {
     pedido.nfeId = resultado.nfe.id;
     await pedido.save();
 
-    res.status(201).json({ mensagem: 'NF-e emitida a partir do pedido', ...resultado });
+    const sincronizacao = await fecharCicloComMarketplace(pedido, resultado.nfe);
+
+    res.status(201).json({ mensagem: 'NF-e emitida a partir do pedido', ...resultado, sincronizacaoMarketplace: sincronizacao });
+  } catch (error) {
+    res.status(error.status || 400).json({ error: error.message });
+  }
+};
+
+/**
+ * Fecha o ciclo: avisa o marketplace de origem qual NF-e corresponde ao
+ * pedido (ver aviso de incerteza em mercadoLivreService.informarNotaFiscal).
+ * Nunca lança — a NF-e já está emitida e válida independente disso; só
+ * registra sucesso/erro no próprio pedido para permitir nova tentativa.
+ */
+const fecharCicloComMarketplace = async (pedido, nfe) => {
+  if (pedido.plataforma !== 'mercado_livre') {
+    return { tentado: false, motivo: `Fechamento de ciclo ainda não implementado para ${pedido.plataforma}` };
+  }
+
+  try {
+    const conta = await obterContaAtiva(pedido.usuarioId, 'mercado_livre');
+    await mercadoLivreService.informarNotaFiscal(conta.accessToken, {
+      shippingId: pedido.shippingIdExterno,
+      chaveNFe: nfe.chaveNFe,
+      numero: nfe.numero,
+      serie: nfe.serie,
+      dataEmissao: nfe.dataEmissao
+    });
+
+    pedido.notaInformadaAoMarketplace = true;
+    pedido.erroSincronizacaoMarketplace = null;
+    await pedido.save();
+    return { tentado: true, sucesso: true };
+  } catch (error) {
+    pedido.notaInformadaAoMarketplace = false;
+    pedido.erroSincronizacaoMarketplace = error.message;
+    await pedido.save();
+    return { tentado: true, sucesso: false, erro: error.message };
+  }
+};
+
+/**
+ * POST /api/marketplace/pedidos/:id/reenviar-nota
+ * Tenta de novo o fechamento de ciclo de um pedido que já tem NF-e
+ * emitida mas cuja sincronização com o marketplace falhou antes.
+ */
+const reenviarNotaAoMarketplace = async (req, res) => {
+  try {
+    const pedido = await PedidoMarketplace.findOne({ where: { id: req.params.id, usuarioId: req.usuario.id } });
+    if (!pedido) return res.status(404).json({ error: 'Pedido não encontrado' });
+    if (!pedido.nfeId) return res.status(400).json({ error: 'Esse pedido ainda não tem NF-e emitida' });
+
+    const nfe = await NFe.findByPk(pedido.nfeId);
+    const sincronizacao = await fecharCicloComMarketplace(pedido, nfe);
+    res.json({ sincronizacaoMarketplace: sincronizacao });
   } catch (error) {
     res.status(error.status || 400).json({ error: error.message });
   }
@@ -204,5 +260,6 @@ module.exports = {
   callbackMercadoLivre,
   sincronizarMercadoLivre,
   listarPedidos,
+  reenviarNotaAoMarketplace,
   emitirNfeDoPedido
 };

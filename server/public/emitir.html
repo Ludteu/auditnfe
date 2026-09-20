@@ -575,7 +575,7 @@
         <h2>Pedidos importados <button class="btn small secondary" onclick="carregarPedidosMarketplace()" style="margin-left:8px">Atualizar</button></h2>
         <p class="hint">O marketplace não fornece CPF/CNPJ do comprador — preencha antes de emitir. Itens cujo SKU não bate com nenhum produto cadastrado bloqueiam a emissão (evita adivinhar preço/NCM).</p>
         <table>
-          <thead><tr><th>Plataforma</th><th>Pedido</th><th>Data</th><th>Valor</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Plataforma</th><th>Pedido</th><th>Data</th><th>Valor</th><th>Status</th><th>Nota no marketplace</th><th></th></tr></thead>
           <tbody id="corpoPedidosMarketplace"></tbody>
         </table>
       </div>
@@ -728,7 +728,7 @@ function renderizarGraficoEvolucao(dados) {
   const larguraPlot = largura - margem.esquerda - margem.direita;
   const alturaPlot = altura - margem.topo - margem.baixo;
 
-  const maxValor = Math.max(1, ...dados.map(d => Math.max(d.totalVendas, d.totalCompras)));
+  const maxValor = Math.max(0, ...dados.map(d => Math.max(d.totalVendas, d.totalCompras)));
   const escala = calcularEscalaY(maxValor);
 
   const n = dados.length;
@@ -1413,6 +1413,12 @@ async function carregarPedidosMarketplace() {
   const r = await api('GET', '/marketplace/pedidos');
   if (!r.ok) return;
 
+  const statusSincronizacao = (p) => {
+    if (p.status !== 'nfe_emitida') return '<span class="pill">—</span>';
+    if (p.notaInformadaAoMarketplace) return '<span class="pill ok">informada ✓</span>';
+    return `<span class="pill err" title="${p.erroSincronizacaoMarketplace || ''}">falhou</span> <button class="link-btn" onclick="reenviarNotaMarketplace('${p.id}')">tentar de novo</button>`;
+  };
+
   document.getElementById('corpoPedidosMarketplace').innerHTML = r.data.pedidos.map(p => `
     <tr>
       <td>${p.plataforma}</td>
@@ -1420,8 +1426,9 @@ async function carregarPedidosMarketplace() {
       <td>${p.dataPedido ? new Date(p.dataPedido).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—'}</td>
       <td>R$ ${Number(p.valorTotal || 0).toFixed(2)}</td>
       <td><span class="pill ${p.status === 'nfe_emitida' ? 'ok' : ''}">${p.status}</span></td>
+      <td>${statusSincronizacao(p)}</td>
       <td>${p.status === 'pendente' ? `<button class="link-btn" onclick="abrirEmissaoPedido('${p.id}')">emitir NF-e</button>` : ''}</td>
-    </tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhum pedido importado ainda</td></tr>';
+    </tr>`).join('') || '<tr><td colspan="7" class="empty">Nenhum pedido importado ainda</td></tr>';
 }
 
 async function abrirEmissaoPedido(pedidoId) {
@@ -1435,12 +1442,21 @@ async function abrirEmissaoPedido(pedidoId) {
   });
 
   if (r.ok) {
-    alert(`NF-e nº ${r.data.nfe.numero} emitida com sucesso a partir do pedido!`);
+    const sinc = r.data.sincronizacaoMarketplace;
+    const msgSinc = sinc?.sucesso ? '\n\n✅ Nota informada ao marketplace.' : sinc?.tentado ? `\n\n⚠️ NF-e emitida, mas não consegui avisar o marketplace: ${sinc.erro}. Dá pra tentar de novo na lista de pedidos.` : '';
+    alert(`NF-e nº ${r.data.nfe.numero} emitida com sucesso a partir do pedido!${msgSinc}`);
     carregarPedidosMarketplace();
     carregarNFes();
   } else {
     alert('Erro: ' + r.data.error + (r.data.itensSemCorrespondencia ? '\n\nItens sem produto: ' + JSON.stringify(r.data.itensSemCorrespondencia) : ''));
   }
+}
+
+async function reenviarNotaMarketplace(pedidoId) {
+  const r = await api('POST', `/marketplace/pedidos/${pedidoId}/reenviar-nota`, {});
+  if (r.ok && r.data.sincronizacaoMarketplace?.sucesso) alert('✅ Nota informada ao marketplace agora.');
+  else alert('❌ Ainda não deu: ' + (r.data.sincronizacaoMarketplace?.erro || r.data.error));
+  carregarPedidosMarketplace();
 }
 
 async function carregarNFes() {

@@ -43,6 +43,20 @@ const PedidoMarketplace = sequelize.define('PedidoMarketplace', {
     type: DataTypes.DATE,
     allowNull: true
   },
+  shippingIdExterno: {
+    // id do envio na plataforma — necessário para "fechar o ciclo"
+    // (informar a nota fiscal de volta pro marketplace)
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  notaInformadaAoMarketplace: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  erroSincronizacaoMarketplace: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   comprador: {
     // { nome, cpfCnpj, uf, cidade, ... } — formato varia por plataforma
     type: DataTypes.JSONB,

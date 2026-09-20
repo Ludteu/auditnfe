@@ -20,5 +20,6 @@ router.post('/mercado-livre/sincronizar', marketplaceController.sincronizarMerca
 
 router.get('/pedidos', marketplaceController.listarPedidos);
 router.post('/pedidos/:id/emitir', marketplaceController.emitirNfeDoPedido);
+router.post('/pedidos/:id/reenviar-nota', marketplaceController.reenviarNotaAoMarketplace);
 
 module.exports = router;
