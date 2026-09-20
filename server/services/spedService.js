@@ -21,7 +21,9 @@ const gerarArquivoEFD = async (usuarioId, { dataInicio, dataFim, cnpj, razaoSoci
     direcao: 'emitida', // notas recebidas (compras) ainda não entram no EFD — ver EMISSAO.md
     dataEmissao: {
       [Op.gte]: new Date(dataInicio),
-      [Op.lte]: new Date(dataFim)
+      // Vai até o FIM do dia informado, senão uma nota emitida durante o
+      // próprio dia-fim (depois da meia-noite UTC) fica de fora do período.
+      [Op.lte]: new Date(`${dataFim}T23:59:59.999Z`)
     }
   };
 

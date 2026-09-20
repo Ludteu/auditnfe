@@ -205,6 +205,7 @@
     <button data-tab="clientes" onclick="showTab('clientes')">👥 Clientes</button>
     <button data-tab="produtos" onclick="showTab('produtos')">📦 Produtos</button>
     <button data-tab="empresa" onclick="showTab('empresa')">🏢 Minha empresa</button>
+    <button data-tab="fiscal" onclick="showTab('fiscal')">📊 Fiscal</button>
     <button data-tab="atualizacoes" onclick="showTab('atualizacoes')">📰 Atualizações</button>
   </nav>
 
@@ -488,6 +489,27 @@
       </div>
     </section>
 
+    <!-- ===================== FISCAL ===================== -->
+    <section class="tab-panel" id="tab-fiscal">
+      <div class="card">
+        <h2>📊 Fiscal — Resumo e EFD</h2>
+        <p class="hint">Considera só as NF-es <strong>emitidas</strong> (vendas) no período — notas de compra reconhecidas em "Buscar NF-e" ainda não entram aqui. O EFD gerado é simplificado (blocos 0 e C) — revise com um contador antes de entregar à Receita. Ver <a href="#" onclick="alert('Veja TRIBUTACAO_EFD.md no projeto para detalhes completos.');return false">limitações</a>.</p>
+
+        <div class="row">
+          <div><label>Data início</label><input type="date" id="fiscalDataInicio"></div>
+          <div><label>Data fim</label><input type="date" id="fiscalDataFim"></div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <button class="btn secondary" onclick="gerarResumoFiscal()">Resumo fiscal</button>
+          <button class="btn" onclick="gerarEfdArquivo()" id="btnGerarEfd">Gerar arquivo SPED (EFD)</button>
+        </div>
+
+        <div id="resultadoResumoFiscal"></div>
+        <div id="resultadoEfd"></div>
+      </div>
+    </section>
+
     <!-- ===================== ATUALIZAÇÕES ===================== -->
     <section class="tab-panel" id="tab-atualizacoes">
       <div class="card">
@@ -564,6 +586,80 @@ function showTab(name) {
   if (name === 'entrada') carregarNotasRecebidas();
   if (name === 'empresa') carregarCertificados();
   if (name === 'atualizacoes') carregarAtualizacoes();
+  if (name === 'fiscal') preencherPeriodoFiscalPadrao();
+}
+
+function preencherPeriodoFiscalPadrao() {
+  const campoInicio = document.getElementById('fiscalDataInicio');
+  if (campoInicio.value) return;
+  const hoje = new Date();
+  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  campoInicio.value = inicioMes.toISOString().slice(0, 10);
+  document.getElementById('fiscalDataFim').value = hoje.toISOString().slice(0, 10);
+}
+
+async function gerarResumoFiscal() {
+  const resultadoEl = document.getElementById('resultadoResumoFiscal');
+  const dataInicio = document.getElementById('fiscalDataInicio').value;
+  const dataFim = document.getElementById('fiscalDataFim').value;
+  if (!dataInicio || !dataFim) return alert('Informe o período');
+
+  resultadoEl.innerHTML = '';
+  const r = await api('POST', '/fiscal/tributacao/resumo', { dataInicio, dataFim });
+  if (!r.ok) { resultadoEl.innerHTML = `<div class="resultado erro">❌ ${r.data.error}</div>`; return; }
+
+  const d = r.data;
+  resultadoEl.innerHTML = `
+    <div class="totais">
+      <div class="item"><div class="v">${d.totalNotas}</div><div class="k">notas</div></div>
+      <div class="item"><div class="v">R$ ${d.valorTotalProdutos.toFixed(2)}</div><div class="k">total produtos</div></div>
+      <div class="item"><div class="v">R$ ${d.valorTotalIcms.toFixed(2)}</div><div class="k">ICMS</div></div>
+      <div class="item"><div class="v">R$ ${d.valorTotalIpi.toFixed(2)}</div><div class="k">IPI</div></div>
+      <div class="item"><div class="v">${d.cargaTributariaPercentual}%</div><div class="k">carga tributária</div></div>
+    </div>`;
+}
+
+async function gerarEfdArquivo() {
+  const dataInicio = document.getElementById('fiscalDataInicio').value;
+  const dataFim = document.getElementById('fiscalDataFim').value;
+  const resultadoEl = document.getElementById('resultadoEfd');
+  resultadoEl.innerHTML = '';
+
+  if (!dataInicio || !dataFim) return alert('Informe o período');
+  if (!empresa?.cnpj) return alert('Carregue o perfil da empresa primeiro');
+
+  const btn = document.getElementById('btnGerarEfd');
+  btn.disabled = true; btn.textContent = 'Gerando...';
+
+  const params = new URLSearchParams({
+    dataInicio, dataFim, cnpj: empresa.cnpj, razaoSocial: empresa.razaoSocial || empresa.nome
+  });
+
+  try {
+    const res = await fetch(baseUrl + '/fiscal/sped/efd/download?' + params.toString(), {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+
+    if (!res.ok) {
+      const erro = await res.json().catch(() => ({}));
+      resultadoEl.innerHTML = `<div class="resultado erro">❌ ${erro.error || 'Erro ao gerar o arquivo'}</div>`;
+      return;
+    }
+
+    const blob = await res.blob();
+    const nomeArquivo = (res.headers.get('Content-Disposition') || '').match(/filename="(.+)"/)?.[1] || 'EFD.txt';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = nomeArquivo;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+
+    resultadoEl.innerHTML = `<div class="resultado sucesso">✅ Arquivo <strong>${nomeArquivo}</strong> gerado e baixado</div>`;
+  } catch (error) {
+    resultadoEl.innerHTML = `<div class="resultado erro">❌ ${error.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Gerar arquivo SPED (EFD)';
+  }
 }
 
 async function carregarInformesPortal() {

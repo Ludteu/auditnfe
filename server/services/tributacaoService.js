@@ -118,7 +118,9 @@ const calcularResumoFiscal = async (usuarioId, { dataInicio, dataFim } = {}) => 
   if (dataInicio || dataFim) {
     where.dataEmissao = {};
     if (dataInicio) where.dataEmissao[Op.gte] = new Date(dataInicio);
-    if (dataFim) where.dataEmissao[Op.lte] = new Date(dataFim);
+    // Data-fim "só data" (sem hora) precisa ir até o FIM do dia, senão uma
+    // nota emitida às 10h do próprio dia-fim fica de fora do período.
+    if (dataFim) where.dataEmissao[Op.lte] = new Date(`${dataFim}T23:59:59.999Z`);
   }
 
   const nfes = await NFe.findAll({ where });
