@@ -8,6 +8,8 @@ const MovimentacaoEstoque = require('./MovimentacaoEstoque');
 const Destinatario = require('./Destinatario');
 const ItemNFe = require('./ItemNFe');
 const InformeNFe = require('./InformeNFe');
+const ContaMarketplace = require('./ContaMarketplace');
+const PedidoMarketplace = require('./PedidoMarketplace');
 
 module.exports = {
   sequelize,
@@ -18,5 +20,7 @@ module.exports = {
   MovimentacaoEstoque,
   Destinatario,
   ItemNFe,
-  InformeNFe
+  InformeNFe,
+  ContaMarketplace,
+  PedidoMarketplace
 };

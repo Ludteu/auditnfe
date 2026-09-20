@@ -206,6 +206,7 @@
     <button data-tab="produtos" onclick="showTab('produtos')">📦 Produtos</button>
     <button data-tab="empresa" onclick="showTab('empresa')">🏢 Minha empresa</button>
     <button data-tab="fiscal" onclick="showTab('fiscal')">📊 Fiscal</button>
+    <button data-tab="marketplace" onclick="showTab('marketplace')">🛒 Marketplace</button>
     <button data-tab="atualizacoes" onclick="showTab('atualizacoes')">📰 Atualizações</button>
   </nav>
 
@@ -510,6 +511,41 @@
       </div>
     </section>
 
+    <!-- ===================== MARKETPLACE ===================== -->
+    <section class="tab-panel" id="tab-marketplace">
+      <div class="card">
+        <h2>🛒 Marketplace</h2>
+        <p class="hint">Importa pedidos de marketplaces e emite a NF-e correspondente casando os itens por código (SKU) com o catálogo de Produtos. Hoje só <strong>Mercado Livre</strong> está de fato integrado — Shopee, Magalu e TikTok Shop usam a mesma arquitetura de dados, mas cada uma exige aprovação/credenciais próprias na respectiva plataforma antes de dar pra conectar de verdade.</p>
+        <div id="avisoMarketplaceRedirect"></div>
+      </div>
+
+      <div class="card" id="cardMercadoLivreDesconfigurado" hidden>
+        <h2>Mercado Livre — integração não configurada</h2>
+        <p class="hint">Falta configurar as credenciais no servidor. Crie um app gratuito em <a href="https://developers.mercadolivre.com.br/" target="_blank" rel="noopener">developers.mercadolivre.com.br</a>, anote o Client ID/Secret, e defina no <code>.env</code>: <code>MERCADOLIVRE_CLIENT_ID</code>, <code>MERCADOLIVRE_CLIENT_SECRET</code> e <code>MERCADOLIVRE_REDIRECT_URI</code> (Redirect URI do app precisa ser idêntico ao valor configurado).</p>
+      </div>
+
+      <div class="card" id="cardMercadoLivreConectar" hidden>
+        <h2>Mercado Livre</h2>
+        <p class="hint">Nenhuma conta conectada ainda.</p>
+        <button class="btn" onclick="conectarMercadoLivre()">Conectar Mercado Livre</button>
+      </div>
+
+      <div class="card" id="cardMercadoLivreConectado" hidden>
+        <h2>Mercado Livre <span class="pill ok">conectado como <span id="mlNomeExibicao"></span></span></h2>
+        <button class="btn secondary" onclick="sincronizarMercadoLivre()" id="btnSincronizarMl">Sincronizar pedidos</button>
+        <div id="resultadoSincronizacaoMl"></div>
+      </div>
+
+      <div class="card">
+        <h2>Pedidos importados <button class="btn small secondary" onclick="carregarPedidosMarketplace()" style="margin-left:8px">Atualizar</button></h2>
+        <p class="hint">O marketplace não fornece CPF/CNPJ do comprador — preencha antes de emitir. Itens cujo SKU não bate com nenhum produto cadastrado bloqueiam a emissão (evita adivinhar preço/NCM).</p>
+        <table>
+          <thead><tr><th>Plataforma</th><th>Pedido</th><th>Data</th><th>Valor</th><th>Status</th><th></th></tr></thead>
+          <tbody id="corpoPedidosMarketplace"></tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- ===================== ATUALIZAÇÕES ===================== -->
     <section class="tab-panel" id="tab-atualizacoes">
       <div class="card">
@@ -553,6 +589,11 @@ let itens = [];
 document.getElementById('loginEmail').value = 'empresa' + Date.now() + '@exemplo.com';
 document.getElementById('loginCnpj').value = String(Date.now()).slice(-14).padStart(14, '1');
 
+(async () => {
+  const sessaoRetomada = await tentarRetomarSessao();
+  if (sessaoRetomada) tratarRetornoOAuthMarketplace();
+})();
+
 async function api(method, path, body) {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = 'Bearer ' + token;
@@ -571,9 +612,34 @@ async function apiUpload(path, formData) {
 
 function sair() {
   token = null; empresa = null;
+  try { localStorage.removeItem('nfeEmitterToken'); } catch (e) {}
   document.getElementById('appShell').hidden = true;
   document.getElementById('empresaInfoWrap').hidden = true;
   document.getElementById('loginCard').hidden = false;
+}
+
+/**
+ * Tenta retomar a sessão a partir do token salvo em localStorage — é o
+ * que faz o fluxo de OAuth do Mercado Livre funcionar: a página sai
+ * inteira para o Mercado Livre e volta como um carregamento novo, então
+ * sem isso o usuário perderia o login no meio da conexão.
+ */
+async function tentarRetomarSessao() {
+  let tokenSalvo;
+  try { tokenSalvo = localStorage.getItem('nfeEmitterToken'); } catch (e) { return false; }
+  if (!tokenSalvo) return false;
+
+  token = tokenSalvo;
+  const r = await api('GET', '/usuarios/perfil');
+  if (!r.ok) { token = null; try { localStorage.removeItem('nfeEmitterToken'); } catch (e) {} return false; }
+
+  document.getElementById('loginCard').hidden = true;
+  document.getElementById('appShell').hidden = false;
+  document.getElementById('empresaInfoWrap').hidden = false;
+  await carregarPerfil();
+  await carregarNFes();
+  showTab('emitir');
+  return true;
 }
 
 function showTab(name) {
@@ -587,6 +653,7 @@ function showTab(name) {
   if (name === 'empresa') carregarCertificados();
   if (name === 'atualizacoes') carregarAtualizacoes();
   if (name === 'fiscal') preencherPeriodoFiscalPadrao();
+  if (name === 'marketplace') { carregarContasMarketplace(); carregarPedidosMarketplace(); }
 }
 
 function preencherPeriodoFiscalPadrao() {
@@ -750,12 +817,34 @@ function mostrarErroLogin(msg) {
 
 async function onLogin(data) {
   token = data.token;
+  try { localStorage.setItem('nfeEmitterToken', token); } catch (e) {}
   document.getElementById('loginCard').hidden = true;
   document.getElementById('appShell').hidden = false;
   document.getElementById('empresaInfoWrap').hidden = false;
   await carregarPerfil();
   await carregarNFes();
   showTab('emitir');
+  tratarRetornoOAuthMarketplace();
+}
+
+/**
+ * Se a página acabou de carregar por causa do redirect do Mercado Livre
+ * (?marketplace=conectado|erro&msg=...), mostra o resultado e vai direto
+ * pra aba Marketplace — depois limpa a URL pra um F5 não repetir o aviso.
+ */
+function tratarRetornoOAuthMarketplace() {
+  const params = new URLSearchParams(window.location.search);
+  const resultado = params.get('marketplace');
+  if (!resultado) return;
+
+  showTab('marketplace');
+  const msg = params.get('msg') || '';
+  const el = document.getElementById('avisoMarketplaceRedirect');
+  el.innerHTML = resultado === 'conectado'
+    ? `<div class="resultado sucesso">✅ ${msg}</div>`
+    : `<div class="resultado erro">❌ ${msg}</div>`;
+
+  window.history.replaceState({}, '', window.location.pathname);
 }
 
 let segmentosReforma = [];
@@ -1115,6 +1204,81 @@ async function emitirNFe() {
     document.getElementById('observacoesNota').value = '';
   } else {
     resultadoEl.innerHTML = `<div class="resultado erro">❌ ${r.data.error}</div>`;
+  }
+}
+
+// ---------- Marketplace ----------
+
+async function carregarContasMarketplace() {
+  const r = await api('GET', '/marketplace/contas');
+  if (!r.ok) return;
+
+  document.getElementById('cardMercadoLivreDesconfigurado').hidden = r.data.mercadoLivreConfigurado;
+  if (!r.data.mercadoLivreConfigurado) {
+    document.getElementById('cardMercadoLivreConectar').hidden = true;
+    document.getElementById('cardMercadoLivreConectado').hidden = true;
+    return;
+  }
+
+  const contaMl = r.data.contas.find(c => c.plataforma === 'mercado_livre' && c.ativo);
+  document.getElementById('cardMercadoLivreConectar').hidden = !!contaMl;
+  document.getElementById('cardMercadoLivreConectado').hidden = !contaMl;
+  if (contaMl) document.getElementById('mlNomeExibicao').textContent = contaMl.nomeExibicao || contaMl.contaExternaId;
+}
+
+async function conectarMercadoLivre() {
+  const r = await api('GET', '/marketplace/mercado-livre/autorizar');
+  if (!r.ok) return alert(r.data.error);
+  window.location.href = r.data.url;
+}
+
+async function sincronizarMercadoLivre() {
+  const btn = document.getElementById('btnSincronizarMl');
+  const resultadoEl = document.getElementById('resultadoSincronizacaoMl');
+  btn.disabled = true; btn.textContent = 'Sincronizando...';
+  resultadoEl.innerHTML = '';
+
+  const r = await api('POST', '/marketplace/mercado-livre/sincronizar', {});
+  btn.disabled = false; btn.textContent = 'Sincronizar pedidos';
+
+  resultadoEl.innerHTML = r.ok
+    ? `<div class="resultado sucesso">✅ ${r.data.novos} pedido(s) novo(s) (${r.data.totalNaPlataforma} no total na plataforma)</div>`
+    : `<div class="resultado erro">❌ ${r.data.error}</div>`;
+
+  if (r.ok) carregarPedidosMarketplace();
+}
+
+async function carregarPedidosMarketplace() {
+  const r = await api('GET', '/marketplace/pedidos');
+  if (!r.ok) return;
+
+  document.getElementById('corpoPedidosMarketplace').innerHTML = r.data.pedidos.map(p => `
+    <tr>
+      <td>${p.plataforma}</td>
+      <td>${p.pedidoExternoId}</td>
+      <td>${p.dataPedido ? new Date(p.dataPedido).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—'}</td>
+      <td>R$ ${Number(p.valorTotal || 0).toFixed(2)}</td>
+      <td><span class="pill ${p.status === 'nfe_emitida' ? 'ok' : ''}">${p.status}</span></td>
+      <td>${p.status === 'pendente' ? `<button class="link-btn" onclick="abrirEmissaoPedido('${p.id}')">emitir NF-e</button>` : ''}</td>
+    </tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhum pedido importado ainda</td></tr>';
+}
+
+async function abrirEmissaoPedido(pedidoId) {
+  const cpfCnpj = prompt('CPF ou CNPJ do comprador (o marketplace não fornece isso automaticamente):');
+  if (!cpfCnpj) return;
+  const uf = prompt('UF do comprador (ex: SP):');
+  if (!uf) return;
+
+  const r = await api('POST', `/marketplace/pedidos/${pedidoId}/emitir`, {
+    destinatario: { cpfCnpj, uf: uf.toUpperCase() }
+  });
+
+  if (r.ok) {
+    alert(`NF-e nº ${r.data.nfe.numero} emitida com sucesso a partir do pedido!`);
+    carregarPedidosMarketplace();
+    carregarNFes();
+  } else {
+    alert('Erro: ' + r.data.error + (r.data.itensSemCorrespondencia ? '\n\nItens sem produto: ' + JSON.stringify(r.data.itensSemCorrespondencia) : ''));
   }
 }
 

@@ -194,6 +194,49 @@ ALTER TABLE movimentacoes_estoque ADD CONSTRAINT chk_tipo_movimentacao
   CHECK (tipo IN ('entrada', 'saida', 'ajuste'));
 
 -- Cache de informes vistos na home do Portal da NF-e (ver nfePortalService.js)
+-- Contas de marketplace conectadas (hoje só Mercado Livre) — ver mercadoLivreService.js
+CREATE TABLE IF NOT EXISTS contas_marketplace (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  usuarioId UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  plataforma VARCHAR(20) NOT NULL,
+  contaExternaId VARCHAR,
+  nomeExibicao VARCHAR,
+  accessToken TEXT,
+  refreshToken TEXT,
+  tokenExpiraEm TIMESTAMP,
+  ultimaSincronizacaoEm TIMESTAMP,
+  ativo BOOLEAN DEFAULT true,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (usuarioId, plataforma)
+);
+
+ALTER TABLE contas_marketplace ADD CONSTRAINT chk_plataforma_conta
+  CHECK (plataforma IN ('mercado_livre', 'shopee', 'magalu', 'tiktok_shop'));
+
+-- Pedidos importados de marketplace, aguardando ou já com NF-e emitida
+CREATE TABLE IF NOT EXISTS pedidos_marketplace (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  usuarioId UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  contaMarketplaceId UUID NOT NULL REFERENCES contas_marketplace(id),
+  plataforma VARCHAR(20) NOT NULL,
+  pedidoExternoId VARCHAR NOT NULL,
+  dataPedido TIMESTAMP,
+  comprador JSONB,
+  itens JSONB NOT NULL,
+  valorTotal DECIMAL(15, 2),
+  status VARCHAR(15) NOT NULL DEFAULT 'pendente',
+  nfeId UUID REFERENCES nfes(id),
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (usuarioId, plataforma, pedidoExternoId)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pedidos_marketplace_status ON pedidos_marketplace(status);
+
+ALTER TABLE pedidos_marketplace ADD CONSTRAINT chk_status_pedido_marketplace
+  CHECK (status IN ('pendente', 'nfe_emitida', 'ignorado'));
+
 CREATE TABLE IF NOT EXISTS informes_nfe (
   id VARCHAR PRIMARY KEY,
   data DATE,
@@ -237,3 +280,5 @@ COMMENT ON TABLE movimentacoes_estoque IS 'Histórico de entradas, saídas e aju
 COMMENT ON TABLE destinatarios IS 'Clientes (destinatários de NF-e) cadastrados por usuário';
 COMMENT ON TABLE itens_nfe IS 'Linhas de produto de uma NF-e emitida via POST /api/nfe/emitir';
 COMMENT ON TABLE informes_nfe IS 'Cache dos informes já vistos na home do Portal da NF-e (Notas Técnicas, tabelas atualizadas etc.)';
+COMMENT ON TABLE contas_marketplace IS 'Contas de marketplace conectadas via OAuth2 (Mercado Livre e futuramente outros)';
+COMMENT ON TABLE pedidos_marketplace IS 'Pedidos importados de marketplace, aguardando ou já com NF-e emitida';

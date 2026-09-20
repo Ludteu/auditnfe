@@ -12,6 +12,7 @@ const estoqueRoutes = require('./routes/estoque');
 const fiscalRoutes = require('./routes/fiscal');
 const destinatarioRoutes = require('./routes/destinatario');
 const atualizacoesRoutes = require('./routes/atualizacoes');
+const marketplaceRoutes = require('./routes/marketplace');
 const nfePortalService = require('./services/nfePortalService');
 
 const app = express();
@@ -35,6 +36,7 @@ app.use('/api/estoque', estoqueRoutes);
 app.use('/api/fiscal', fiscalRoutes);
 app.use('/api/destinatarios', destinatarioRoutes);
 app.use('/api/atualizacoes', atualizacoesRoutes);
+app.use('/api/marketplace', marketplaceRoutes);
 
 // Rota de health check
 app.get('/api/health', (req, res) => {
