@@ -95,6 +95,19 @@ const resumo = async (req, res) => {
 };
 
 /**
+ * Totais mensais de vendas x compras dos últimos N meses (gráfico de
+ * evolução da aba Fiscal).
+ */
+const evolucao = async (req, res) => {
+  try {
+    const resultado = await tributacaoService.calcularEvolucao(req.usuario.id, { meses: req.query.meses });
+    res.json(resultado);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+/**
  * Gera o arquivo EFD-ICMS/IPI simplificado e retorna metadados + conteúdo
  */
 const gerarEfd = async (req, res) => {
@@ -349,6 +362,7 @@ module.exports = {
   preencherProduto,
   atualizarTributacao,
   resumo,
+  evolucao,
   gerarEfd,
   downloadEfd,
   listarSegmentosReforma,

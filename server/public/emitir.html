@@ -20,6 +20,8 @@
     --warn-dim: rgba(224,166,62,0.12);
     --err: #ff5d6c;
     --err-dim: rgba(255,93,108,0.12);
+    --series-vendas: #3987e5;
+    --series-compras: #d95926;
   }
   * { box-sizing: border-box; }
   body {
@@ -171,6 +173,17 @@
   .timeline-item .descricao { font-size: 12.5px; color: var(--muted); }
   .timeline-item ul { margin: 4px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--muted); }
   .link-list a { display: block; padding: 7px 0; font-size: 13px; }
+  .viz-legend { display: flex; gap: 16px; margin-left: auto; font-size: 12px; color: var(--muted); }
+  .viz-legend-item { display: flex; align-items: center; gap: 6px; }
+  .viz-linekey { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
+  .viz-tooltip {
+    position: absolute; pointer-events: none; background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 7px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.45); z-index: 5;
+    white-space: nowrap;
+  }
+  .viz-tooltip .titulo { color: var(--muted); font-size: 11px; margin-bottom: 4px; }
+  .viz-tooltip .linha { display: flex; align-items: center; gap: 6px; }
+  .viz-tooltip .valor { font-weight: 700; margin-left: auto; padding-left: 14px; }
 </style>
 </head>
 <body>
@@ -509,6 +522,28 @@
         <div id="resultadoResumoFiscal"></div>
         <div id="resultadoEfd"></div>
       </div>
+
+      <div class="card viz-root">
+        <h2>Evolução — Compras x Vendas</h2>
+        <div class="row" style="align-items:center">
+          <div style="flex:0 0 auto">
+            <label>Período</label>
+            <select id="evolucaoMeses" onchange="carregarEvolucao()">
+              <option value="3">Últimos 3 meses</option>
+              <option value="6" selected>Últimos 6 meses</option>
+              <option value="12">Últimos 12 meses</option>
+            </select>
+          </div>
+          <div class="viz-legend">
+            <span class="viz-legend-item"><span class="viz-linekey" style="background:var(--series-vendas)"></span>Vendas</span>
+            <span class="viz-legend-item"><span class="viz-linekey" style="background:var(--series-compras)"></span>Compras</span>
+          </div>
+        </div>
+        <div id="graficoEvolucaoWrap" style="position:relative;margin-top:10px">
+          <svg id="graficoEvolucao" viewBox="0 0 640 240" style="width:100%;height:auto;display:block"></svg>
+          <div id="tooltipEvolucao" class="viz-tooltip" hidden></div>
+        </div>
+      </div>
     </section>
 
     <!-- ===================== MARKETPLACE ===================== -->
@@ -652,8 +687,134 @@ function showTab(name) {
   if (name === 'entrada') carregarNotasRecebidas();
   if (name === 'empresa') carregarCertificados();
   if (name === 'atualizacoes') carregarAtualizacoes();
-  if (name === 'fiscal') preencherPeriodoFiscalPadrao();
+  if (name === 'fiscal') { preencherPeriodoFiscalPadrao(); carregarEvolucao(); }
   if (name === 'marketplace') { carregarContasMarketplace(); carregarPedidosMarketplace(); }
+}
+
+// ---------- Gráfico de evolução (Compras x Vendas) ----------
+
+const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+function calcularEscalaY(maxValor) {
+  if (maxValor <= 0) return { max: 100, ticks: [0, 25, 50, 75, 100] };
+  const passoBruto = maxValor / 4;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(passoBruto)));
+  const residuo = passoBruto / magnitude;
+  let passo;
+  if (residuo >= 5) passo = 10 * magnitude;
+  else if (residuo >= 2) passo = 5 * magnitude;
+  else if (residuo >= 1) passo = 2 * magnitude;
+  else passo = magnitude;
+  return { max: passo * 4, ticks: [0, passo, passo * 2, passo * 3, passo * 4] };
+}
+
+function formatarMesEvolucao(chaveMes) {
+  const [ano, mes] = chaveMes.split('-');
+  return `${MESES_ABREV[parseInt(mes, 10) - 1]}/${ano.slice(2)}`;
+}
+
+async function carregarEvolucao() {
+  const meses = document.getElementById('evolucaoMeses').value;
+  const r = await api('GET', '/fiscal/evolucao?meses=' + meses);
+  if (!r.ok) return;
+  renderizarGraficoEvolucao(r.data.meses);
+}
+
+function renderizarGraficoEvolucao(dados) {
+  const svg = document.getElementById('graficoEvolucao');
+  const tooltip = document.getElementById('tooltipEvolucao');
+  const margem = { esquerda: 46, direita: 12, topo: 14, baixo: 26 };
+  const largura = 640, altura = 240;
+  const larguraPlot = largura - margem.esquerda - margem.direita;
+  const alturaPlot = altura - margem.topo - margem.baixo;
+
+  const maxValor = Math.max(1, ...dados.map(d => Math.max(d.totalVendas, d.totalCompras)));
+  const escala = calcularEscalaY(maxValor);
+
+  const n = dados.length;
+  const x = (i) => margem.esquerda + (n === 1 ? larguraPlot / 2 : (i * larguraPlot) / (n - 1));
+  const y = (v) => margem.topo + alturaPlot - (v / escala.max) * alturaPlot;
+
+  const corTexto = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#8b97b0';
+  const corGrid = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#262f45';
+  const corSuperficie = getComputedStyle(document.documentElement).getPropertyValue('--panel').trim() || '#141b2b';
+  const corVendas = getComputedStyle(document.documentElement).getPropertyValue('--series-vendas').trim();
+  const corCompras = getComputedStyle(document.documentElement).getPropertyValue('--series-compras').trim();
+
+  let svgHtml = '';
+
+  // Gridlines horizontais (hairline, recessivas) + labels do eixo Y
+  escala.ticks.forEach((tick) => {
+    const ty = y(tick);
+    svgHtml += `<line x1="${margem.esquerda}" y1="${ty}" x2="${largura - margem.direita}" y2="${ty}" stroke="${corGrid}" stroke-width="1"/>`;
+    svgHtml += `<text x="${margem.esquerda - 8}" y="${ty + 3}" text-anchor="end" font-size="10" fill="${corTexto}">${formatarValorEixo(tick)}</text>`;
+  });
+
+  // Labels do eixo X (mês)
+  dados.forEach((d, i) => {
+    svgHtml += `<text x="${x(i)}" y="${altura - 8}" text-anchor="middle" font-size="10" fill="${corTexto}">${formatarMesEvolucao(d.mes)}</text>`;
+  });
+
+  const montarLinha = (campo, cor) => {
+    const pontos = dados.map((d, i) => `${x(i)},${y(d[campo])}`).join(' ');
+    let html = `<polyline points="${pontos}" fill="none" stroke="${cor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    dados.forEach((d, i) => {
+      html += `<circle cx="${x(i)}" cy="${y(d[campo])}" r="4" fill="${cor}" stroke="${corSuperficie}" stroke-width="2"/>`;
+    });
+    return html;
+  };
+
+  svgHtml += montarLinha('totalCompras', corCompras);
+  svgHtml += montarLinha('totalVendas', corVendas);
+
+  // Crosshair (oculto até o hover)
+  svgHtml += `<line id="crosshairEvolucao" x1="0" y1="${margem.topo}" x2="0" y2="${margem.topo + alturaPlot}" stroke="${corTexto}" stroke-width="1" opacity="0" pointer-events="none"/>`;
+
+  // Camada de hit-target: uma faixa vertical por mês, mais larga que a linha
+  const larguraFaixa = n > 1 ? larguraPlot / (n - 1) : larguraPlot;
+  dados.forEach((d, i) => {
+    svgHtml += `<rect x="${x(i) - larguraFaixa / 2}" y="${margem.topo}" width="${larguraFaixa}" height="${alturaPlot}" fill="transparent" data-indice="${i}" class="viz-hit"/>`;
+  });
+
+  svg.innerHTML = svgHtml;
+
+  const mostrarTooltip = (indice) => {
+    const d = dados[indice];
+    if (!d) return;
+    document.getElementById('crosshairEvolucao').setAttribute('x1', x(indice));
+    document.getElementById('crosshairEvolucao').setAttribute('x2', x(indice));
+    document.getElementById('crosshairEvolucao').setAttribute('opacity', '1');
+
+    tooltip.innerHTML = `
+      <div class="titulo">${formatarMesEvolucao(d.mes)}</div>
+      <div class="linha"><span class="viz-linekey" style="background:${corVendas}"></span>Vendas<span class="valor">R$ ${d.totalVendas.toFixed(2)}</span></div>
+      <div class="linha"><span class="viz-linekey" style="background:${corCompras}"></span>Compras<span class="valor">R$ ${d.totalCompras.toFixed(2)}</span></div>
+    `;
+    tooltip.hidden = false;
+
+    const wrapRect = document.getElementById('graficoEvolucaoWrap').getBoundingClientRect();
+    const escalaPx = wrapRect.width / largura;
+    let esquerda = x(indice) * escalaPx + 10;
+    if (esquerda + 150 > wrapRect.width) esquerda = x(indice) * escalaPx - 160;
+    tooltip.style.left = esquerda + 'px';
+    tooltip.style.top = (y(Math.max(d.totalVendas, d.totalCompras)) * (wrapRect.height / altura) - 10) + 'px';
+  };
+
+  const esconderTooltip = () => {
+    tooltip.hidden = true;
+    document.getElementById('crosshairEvolucao').setAttribute('opacity', '0');
+  };
+
+  svg.querySelectorAll('.viz-hit').forEach((el) => {
+    el.addEventListener('pointerenter', () => mostrarTooltip(parseInt(el.dataset.indice, 10)));
+    el.addEventListener('pointermove', () => mostrarTooltip(parseInt(el.dataset.indice, 10)));
+  });
+  svg.addEventListener('pointerleave', esconderTooltip);
+}
+
+function formatarValorEixo(v) {
+  if (v >= 1000) return (v / 1000).toFixed(v % 1000 === 0 ? 0 : 1) + 'k';
+  return String(Math.round(v));
 }
 
 function preencherPeriodoFiscalPadrao() {

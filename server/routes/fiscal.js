@@ -30,6 +30,7 @@ router.post('/tributacao/produtos', tributacaoController.preencherProduto);
 router.put('/tributacao/:id', tributacaoController.atualizarTributacao);
 router.post('/tributacao/resumo', tributacaoController.resumo);
 router.get('/tributacao/resumo', tributacaoController.resumo);
+router.get('/evolucao', tributacaoController.evolucao);
 
 /**
  * SPED / EFD

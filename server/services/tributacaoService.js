@@ -160,9 +160,54 @@ const calcularResumoFiscal = async (usuarioId, { dataInicio, dataFim } = {}) => 
   };
 };
 
+/**
+ * Totais mensais de vendas (NFe emitidas) e compras (NFe recebidas) dos
+ * últimos N meses — para o gráfico de evolução da aba Fiscal.
+ */
+const calcularEvolucao = async (usuarioId, { meses = 6 } = {}) => {
+  const qtdMeses = Math.min(Math.max(parseInt(meses, 10) || 6, 1), 24);
+  const hoje = new Date();
+  const inicio = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth() - (qtdMeses - 1), 1));
+
+  const nfes = await NFe.findAll({
+    where: {
+      usuarioId,
+      direcao: { [Op.in]: ['emitida', 'recebida'] },
+      dataEmissao: { [Op.gte]: inicio }
+    },
+    attributes: ['direcao', 'dataEmissao', 'valor']
+  });
+
+  const buckets = new Map();
+  for (let i = 0; i < qtdMeses; i++) {
+    const d = new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth() + i, 1));
+    const chave = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    buckets.set(chave, { mes: chave, totalVendas: 0, totalCompras: 0 });
+  }
+
+  for (const nfe of nfes) {
+    const d = new Date(nfe.dataEmissao);
+    const chave = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    const bucket = buckets.get(chave);
+    if (!bucket) continue;
+    const valor = Number(nfe.valor || 0);
+    if (nfe.direcao === 'emitida') bucket.totalVendas += valor;
+    else bucket.totalCompras += valor;
+  }
+
+  return {
+    meses: Array.from(buckets.values()).map((b) => ({
+      mes: b.mes,
+      totalVendas: Number(b.totalVendas.toFixed(2)),
+      totalCompras: Number(b.totalCompras.toFixed(2))
+    }))
+  };
+};
+
 module.exports = {
   extrairCabecalho,
   extrairTributacao,
   aplicarTributacaoProduto,
-  calcularResumoFiscal
+  calcularResumoFiscal,
+  calcularEvolucao
 };
