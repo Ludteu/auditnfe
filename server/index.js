@@ -28,6 +28,8 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Console de testes (interface HTML simples que consome a API)
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/', (req, res) => res.redirect('/emitir.html'));
+
 // Rotas
 app.use('/api/auth', authRoutes);
 app.use('/api/usuarios', usuarioRoutes);
