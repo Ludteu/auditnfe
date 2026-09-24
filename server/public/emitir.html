@@ -483,14 +483,12 @@
 
       <div class="card">
         <h2>🔐 Certificado digital</h2>
-        <p class="hint">Necessário para assinar NF-es e para buscar notas direto na SEFAZ. Aceita arquivos .pfx ou .p12 (padrão A1). A senha do certificado não é salva aqui — ela vem da variável de ambiente <code>CERT_PASSWORD</code> no <code>.env</code> do servidor.</p>
+        <p class="hint">Necessário para assinar NF-es e para buscar notas direto na SEFAZ. Aceita arquivos .pfx ou .p12 (padrão A1). O CNPJ vem do cadastro da empresa e a validade é lida direto do certificado — só precisa do arquivo e da senha dele.</p>
 
         <label>Arquivo do certificado (.pfx / .p12)</label>
         <input type="file" id="certArquivo" accept=".pfx,.p12">
-        <div class="row">
-          <div><label>CNPJ vinculado</label><input id="certCnpj"></div>
-          <div><label>Válido até</label><input type="date" id="certValidoAte"></div>
-        </div>
+        <label>Senha do certificado</label>
+        <input type="password" id="certSenha" placeholder="Senha usada para abrir o .pfx/.p12">
         <label>Descrição</label>
         <input id="certDescricao" placeholder="Ex: Certificado A1 principal">
         <button class="btn secondary" style="margin-top:12px" id="btnEnviarCert" onclick="enviarCertificado()">Enviar certificado</button>
@@ -1070,13 +1068,12 @@ async function enviarCertificado() {
   resultadoEl.innerHTML = '';
 
   if (!arquivo) return alert('Escolha o arquivo .pfx ou .p12');
-  const validoAte = document.getElementById('certValidoAte').value;
-  if (!validoAte) return alert('Informe a data de validade do certificado');
+  const senha = document.getElementById('certSenha').value;
+  if (!senha) return alert('Informe a senha do certificado');
 
   const formData = new FormData();
   formData.append('certificado', arquivo);
-  formData.append('cnpj', document.getElementById('certCnpj').value.replace(/\D/g, ''));
-  formData.append('validoAte', validoAte);
+  formData.append('senha', senha);
   formData.append('descricao', document.getElementById('certDescricao').value);
 
   const btn = document.getElementById('btnEnviarCert');
@@ -1085,8 +1082,9 @@ async function enviarCertificado() {
   btn.disabled = false; btn.textContent = 'Enviar certificado';
 
   if (r.ok) {
-    resultadoEl.innerHTML = `<div class="resultado sucesso">✅ Certificado enviado com sucesso</div>`;
+    resultadoEl.innerHTML = `<div class="resultado sucesso">✅ Certificado enviado com sucesso — válido até ${new Date(r.data.certificado.validoAte).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</div>`;
     document.getElementById('certArquivo').value = '';
+    document.getElementById('certSenha').value = '';
     document.getElementById('certDescricao').value = '';
     carregarCertificados();
   } else {

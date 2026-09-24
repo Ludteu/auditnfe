@@ -14,6 +14,7 @@ const destinatarioRoutes = require('./routes/destinatario');
 const atualizacoesRoutes = require('./routes/atualizacoes');
 const marketplaceRoutes = require('./routes/marketplace');
 const nfePortalService = require('./services/nfePortalService');
+const Certificado = require('./models/Certificado');
 
 const app = express();
 
@@ -62,7 +63,15 @@ app.use((req, res) => {
 // Sincronizar BD e iniciar servidor
 const PORT = process.env.PORT || 5000;
 
-sequelize.sync({ alter: false }).then(() => {
+sequelize.sync({ alter: false }).then(() => (
+  // Projeto não tem migrations formais (só sync); a tabela "certificados" já
+  // existe em produção sem a coluna "senha" (adicionada depois que o upload
+  // de certificado passou a exigi-la). alter:true aqui é escopo só nesse
+  // model — não mexe no resto do schema — pra chegar a produção sem passo
+  // manual. Seguro porque essa tabela é pequena e não tinha certificado
+  // real cadastrado ainda.
+  Certificado.sync({ alter: true })
+)).then(() => {
   app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
     console.log(`📊 Ambiente: ${process.env.NODE_ENV}`);

@@ -7,6 +7,8 @@ const Usuario = require('../models/Usuario');
 const Certificado = require('../models/Certificado');
 const { consultarCnpj } = require('../services/cnpjLookupService');
 const { SEGMENTOS_VALIDOS } = require('../services/reformaTributariaService');
+const { lerCertificadoPfx } = require('../services/certificadoPfxService');
+const { criptografar } = require('../utils/criptografia');
 
 const router = express.Router();
 
@@ -118,7 +120,7 @@ router.get('/certificados', async (req, res) => {
   try {
     const certificados = await Certificado.findAll({
       where: { usuarioId: req.usuario.id },
-      attributes: { exclude: ['caminhoArquivo'] },
+      attributes: { exclude: ['caminhoArquivo', 'senha'] },
       order: [['createdAt', 'DESC']]
     });
 
@@ -136,7 +138,7 @@ router.get('/certificados/:id', async (req, res) => {
   try {
     const certificado = await Certificado.findOne({
       where: { id: req.params.id, usuarioId: req.usuario.id },
-      attributes: { exclude: ['caminhoArquivo'] }
+      attributes: { exclude: ['caminhoArquivo', 'senha'] }
     });
 
     if (!certificado) {
@@ -152,9 +154,12 @@ router.get('/certificados/:id', async (req, res) => {
 /**
  * POST /api/usuarios/certificados/upload
  * Envia o arquivo .pfx/.p12 do certificado digital (multipart/form-data,
- * campo "certificado") e registra os metadados. O arquivo fica salvo em
- * uploads/certificados — a senha para assiná-lo/usá-lo continua vindo da
- * variável de ambiente CERT_PASSWORD (.env), nunca é salva no banco.
+ * campo "certificado") junto com a senha dele (campo "senha", obrigatório).
+ * O CNPJ vem do cadastro de "Minha empresa" (não se pergunta de novo) e a
+ * validade é lida do próprio certificado — abrir o arquivo com a senha
+ * informada já serve de validação: se a senha estiver errada, rejeita aqui
+ * na hora, em vez de deixar o buscador da SEFAZ falhar em silêncio depois.
+ * A senha é criptografada antes de ir pro banco (server/utils/criptografia.js).
  */
 router.post('/certificados/upload', uploadCertificado.single('certificado'), async (req, res) => {
   try {
@@ -162,57 +167,48 @@ router.post('/certificados/upload', uploadCertificado.single('certificado'), asy
       return res.status(400).json({ error: 'Envie o arquivo do certificado no campo "certificado"' });
     }
 
+    const limpar = () => fs.unlinkSync(req.file.path);
+
     if (!/\.(pfx|p12)$/i.test(req.file.originalname)) {
-      fs.unlinkSync(req.file.path);
+      limpar();
       return res.status(400).json({ error: 'Envie um arquivo .pfx ou .p12' });
     }
 
-    const { cnpj, validoAte, descricao } = req.body;
-    if (!cnpj || !validoAte) {
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({ error: 'cnpj e validoAte são obrigatórios' });
+    const { senha, descricao } = req.body;
+    if (!senha) {
+      limpar();
+      return res.status(400).json({ error: 'Informe a senha do certificado' });
+    }
+
+    const usuario = await Usuario.findByPk(req.usuario.id);
+    if (!usuario?.cnpj) {
+      limpar();
+      return res.status(400).json({ error: 'Cadastre o CNPJ da empresa em "Minha empresa" antes de enviar o certificado' });
+    }
+
+    let infoCertificado;
+    try {
+      infoCertificado = lerCertificadoPfx(req.file.path, senha);
+    } catch (error) {
+      limpar();
+      return res.status(400).json({ error: error.message });
     }
 
     const certificado = await Certificado.create({
       usuarioId: req.usuario.id,
-      cnpj,
-      validoAte: new Date(validoAte),
+      cnpj: usuario.cnpj,
+      validoAte: infoCertificado.validoAte,
       descricao: descricao || req.file.originalname,
       caminhoArquivo: req.file.path,
+      senha: criptografar(senha),
       ativo: true
     });
 
     const resposta = certificado.toJSON();
     delete resposta.caminhoArquivo;
+    delete resposta.senha;
 
     res.status(201).json({ mensagem: 'Certificado enviado com sucesso', certificado: resposta });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-/**
- * POST /api/usuarios/certificados
- * Adicionar novo certificado (avançado: aponta para um arquivo já
- * existente no servidor em vez de fazer upload — use /upload na UI)
- */
-router.post('/certificados', async (req, res) => {
-  try {
-    const { cnpj, validoAte, descricao, caminhoArquivo } = req.body;
-
-    const certificado = await Certificado.create({
-      usuarioId: req.usuario.id,
-      cnpj,
-      validoAte: new Date(validoAte),
-      descricao,
-      caminhoArquivo,
-      ativo: true
-    });
-
-    res.status(201).json({
-      mensagem: 'Certificado adicionado com sucesso',
-      certificado
-    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

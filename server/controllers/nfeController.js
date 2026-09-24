@@ -4,6 +4,7 @@ const { xmlParaObjeto, validarXmlBasico, extrairChaveNFe, formatarXml } = requir
 const { assinarXml } = require('../services/assinaturaService');
 const { enviarNFeAutorizacao, consultarStatusNFe } = require('../services/sefazService');
 const emissaoService = require('../services/emissaoService');
+const { descriptografar } = require('../utils/criptografia');
 const { Op } = require('sequelize');
 
 /**
@@ -187,7 +188,7 @@ const assinar = async (req, res) => {
     const xmlAssinado = await assinarXml(
       nfe.xmlContent,
       certificado.caminhoArquivo,
-      process.env.CERT_PASSWORD
+      descriptografar(certificado.senha)
     );
 
     // Salvar XML assinado
@@ -237,7 +238,7 @@ const enviar = async (req, res) => {
     const resposta = await enviarNFeAutorizacao(
       nfe.xmlAssinado,
       certificado.caminhoArquivo,
-      process.env.CERT_PASSWORD,
+      descriptografar(certificado.senha),
       nfe.cnpj.substring(8, 10) // UF extraída do CNPJ
     );
 
@@ -284,7 +285,7 @@ const consultarStatus = async (req, res) => {
     const resposta = await consultarStatusNFe(
       chaveNFe,
       certificado.caminhoArquivo,
-      process.env.CERT_PASSWORD
+      descriptografar(certificado.senha)
     );
 
     // Atualizar status

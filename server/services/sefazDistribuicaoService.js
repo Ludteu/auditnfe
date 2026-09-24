@@ -20,6 +20,7 @@ const zlib = require('zlib');
 const { xmlParaObjeto } = require('../utils/xmlHelper');
 const { CODIGO_UF } = require('./nfeXmlBuilder');
 const Certificado = require('../models/Certificado');
+const { descriptografar } = require('../utils/criptografia');
 
 // URLs do Ambiente Nacional (AN) — a Distribuição DFe é centralizada,
 // não usa os webservices estaduais de autorização.
@@ -89,16 +90,11 @@ const buscarNovasNotas = async (usuarioId, { cnpj, uf, ultimoNSU = '0' }) => {
     throw new Error('Nenhum certificado digital ativo encontrado para este CNPJ. Cadastre um em "Minha empresa" → Certificado digital.');
   }
 
-  const senha = process.env.CERT_PASSWORD;
-  if (!senha) {
-    throw new Error('Variável de ambiente CERT_PASSWORD não configurada no servidor (.env) — necessária para abrir o certificado.');
-  }
-
   let agente;
   try {
-    agente = criarAgenteCertificado(certificado.caminhoArquivo, senha);
+    agente = criarAgenteCertificado(certificado.caminhoArquivo, descriptografar(certificado.senha));
   } catch (error) {
-    throw new Error(`Não foi possível carregar o certificado: ${error.message}. Confira se o arquivo é um .pfx/.p12 válido e se CERT_PASSWORD está correta.`);
+    throw new Error(`Não foi possível carregar o certificado: ${error.message}. Confira se o arquivo é um .pfx/.p12 válido.`);
   }
 
   const cUFAutor = CODIGO_UF[String(uf || '').toUpperCase()];

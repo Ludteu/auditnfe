@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS certificados (
   usuarioId UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
   cnpj VARCHAR(14) NOT NULL,
   caminhoArquivo VARCHAR NOT NULL,
+  senha TEXT NOT NULL,
   validoAte TIMESTAMP NOT NULL,
   ativo BOOLEAN DEFAULT true,
   descricao VARCHAR,
