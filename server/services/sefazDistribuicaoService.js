@@ -32,10 +32,12 @@ const URLS_DISTRIBUICAO = {
 // Entrega o par cert/key já em PEM (ver certificadoPfxService.extrairPemDoPfx)
 // em vez de { pfx, passphrase } — o parser de PKCS#12 nativo do Node/OpenSSL
 // 3.x rejeita a cifra RC2-40-CBC que a maioria dos certificados A1 da
-// ICP-Brasil usa, mesmo com a senha certa.
+// ICP-Brasil usa, mesmo com a senha certa. Não define `ca`: a validação do
+// certificado do SERVIDOR da SEFAZ usa a lista de raízes confiáveis padrão
+// do Node normalmente — só a nossa identidade (cert/key) é que vem do .pfx.
 const criarAgenteCertificado = (caminhoArquivo, senha) => {
-  const { certPem, keyPem, caPem } = extrairPemDoPfx(caminhoArquivo, senha);
-  return new https.Agent({ cert: certPem, key: keyPem, ca: caPem });
+  const { certPem, keyPem } = extrairPemDoPfx(caminhoArquivo, senha);
+  return new https.Agent({ cert: certPem, key: keyPem });
 };
 
 const montarEnvelopeDistDFe = ({ tpAmb, cUFAutor, cnpj, ultNSU }) => {

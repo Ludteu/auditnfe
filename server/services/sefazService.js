@@ -24,11 +24,10 @@ const URLS_SEFAZ = {
  */
 const criarAgenteCertificado = (caminhosCertificado, senhaCertificado) => {
   try {
-    const { certPem, keyPem, caPem } = extrairPemDoPfx(caminhosCertificado, senhaCertificado);
+    const { certPem, keyPem } = extrairPemDoPfx(caminhosCertificado, senhaCertificado);
     return new https.Agent({
       cert: certPem,
       key: keyPem,
-      ca: caPem,
       rejectUnauthorized: false // ⚠️ Apenas para desenvolvimento
     });
   } catch (error) {

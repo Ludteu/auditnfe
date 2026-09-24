@@ -52,7 +52,7 @@ const lerCertificadoPfx = (caminhoArquivo, senha) => {
 
 /**
  * Extrai a chave privada e o(s) certificado(s) do .pfx já em PEM, pra usar
- * em https.Agent({ cert, key, ca }) em vez de https.Agent({ pfx, passphrase }).
+ * em https.Agent({ cert, key }) em vez de https.Agent({ pfx, passphrase }).
  * O motivo: a partir do OpenSSL 3.x (Node 17+), o parser nativo de PKCS#12
  * do Node passa a rejeitar arquivos que usam RC2-40-CBC — exatamente a
  * cifra que a maioria dos certificados A1 da ICP-Brasil usa — com o erro
@@ -60,6 +60,17 @@ const lerCertificadoPfx = (caminhoArquivo, senha) => {
  * arquivo íntegro (o node-forge, sendo puro JS, não depende dos provedores
  * do OpenSSL do sistema e não tem essa limitação). Decodificando aqui e
  * entregando PEM pronto, o TLS do Node nunca precisa entender o PKCS#12.
+ *
+ * `certPem` inclui a cadeia inteira do .pfx (folha + intermediárias, nessa
+ * ordem) num só PEM — é assim que se manda uma cadeia de certificado num
+ * handshake TLS. Essa cadeia é só pra identificar ESTE lado (autenticação
+ * mútua); não tem nada a ver com validar o certificado do servidor da
+ * SEFAZ, que usa sua própria CA (pública, já confiável por padrão) — por
+ * isso essa função não devolve nem define `ca` nenhum. Passar a cadeia do
+ * próprio certificado como `ca` do https.Agent SUBSTITUI a lista de raízes
+ * confiáveis padrão do Node em vez de completá-la, e foi exatamente isso
+ * que causou o "unable to get local issuer certificate" ao tentar validar
+ * o servidor da SEFAZ.
  */
 const extrairPemDoPfx = (caminhoArquivo, senha) => {
   const p12 = abrirPfx(caminhoArquivo, senha);
@@ -77,12 +88,9 @@ const extrairPemDoPfx = (caminhoArquivo, senha) => {
     throw new Error('Não foi possível encontrar um certificado dentro do arquivo.');
   }
 
-  const [certFolha, ...cadeia] = listaCertificados.map((bag) => bag.cert);
-
   return {
     keyPem: forge.pki.privateKeyToPem(bagChave.key),
-    certPem: forge.pki.certificateToPem(certFolha),
-    caPem: cadeia.length ? cadeia.map((cert) => forge.pki.certificateToPem(cert)).join('\n') : undefined
+    certPem: listaCertificados.map((bag) => forge.pki.certificateToPem(bag.cert)).join('\n')
   };
 };
 
