@@ -198,7 +198,7 @@ router.post('/certificados/upload', uploadCertificado.single('certificado'), asy
       usuarioId: req.usuario.id,
       cnpj: usuario.cnpj,
       validoAte: infoCertificado.validoAte,
-      descricao: descricao || req.file.originalname,
+      descricao: descricao || infoCertificado.titular || req.file.originalname,
       caminhoArquivo: req.file.path,
       senha: criptografar(senha),
       ativo: true

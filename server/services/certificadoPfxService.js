@@ -20,9 +20,19 @@ const lerCertificadoPfx = (caminhoArquivo, senha) => {
 
   let p12;
   try {
-    p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, senha);
+    // strict:false — certificados reais da ICP-Brasil costumam trazer a
+    // cadeia de intermediárias e atributos extras nos bags que o validador
+    // ASN.1 em modo estrito do forge rejeita mesmo com a senha certa; isso
+    // fazia todo certificado real cair na mensagem de "senha incorreta".
+    p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, senha);
   } catch (error) {
-    throw new Error('Senha do certificado incorreta, ou o arquivo não é um .pfx/.p12 válido.');
+    if (/mac could not be verified|invalid password/i.test(error.message)) {
+      throw new Error('Senha do certificado incorreta.');
+    }
+    // Qualquer outro erro é um problema real de leitura do arquivo (formato,
+    // algoritmo não suportado etc.) — mostrar a causa real em vez de
+    // esconder atrás de "senha incorreta", que só confunde o diagnóstico.
+    throw new Error(`Não foi possível ler o certificado: ${error.message}`);
   }
 
   const bagsCertificado = p12.getBags({ bagType: forge.pki.oids.certBag });
