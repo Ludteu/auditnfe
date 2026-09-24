@@ -299,11 +299,9 @@ const buscarNaSefaz = async (req, res) => {
       return res.status(400).json({ error: 'Configure a UF da empresa em "Minha empresa" antes de buscar na SEFAZ' });
     }
 
-    const { ultimoNSU } = req.body;
-    const resultado = await sefazDistribuicaoService.buscarNovasNotas(req.usuario.id, {
+    const resultado = await sefazDistribuicaoService.sincronizarNotasRecebidas(req.usuario.id, {
       cnpj: usuario.cnpj,
-      uf: usuario.uf,
-      ultimoNSU: ultimoNSU || '0'
+      uf: usuario.uf
     });
 
     res.json(resultado);

@@ -19,8 +19,13 @@ const zlib = require('zlib');
 const { xmlParaObjeto } = require('../utils/xmlHelper');
 const { CODIGO_UF } = require('./nfeXmlBuilder');
 const Certificado = require('../models/Certificado');
+const NFe = require('../models/NFe');
 const { descriptografar } = require('../utils/criptografia');
 const { extrairPemDoPfx } = require('./certificadoPfxService');
+
+// Limite de páginas por sincronização (cada página traz até 50 documentos) —
+// cobre bem mais que o volume normal de 90 dias sem arriscar loop indevido.
+const MAX_PAGINAS_POR_SINCRONIZACAO = 40;
 
 // URLs do Ambiente Nacional (AN) — a Distribuição DFe é centralizada,
 // não usa os webservices estaduais de autorização.
@@ -135,4 +140,152 @@ const buscarNovasNotas = async (usuarioId, { cnpj, uf, ultimoNSU = '0' }) => {
   return processarRespostaDistDFe(resposta.data);
 };
 
-module.exports = { buscarNovasNotas, montarEnvelopeDistDFe, processarRespostaDistDFe };
+/**
+ * A chave de acesso de 44 dígitos já embute série e número da nota
+ * (posições 22-24 e 25-33). Serve de fallback pra documentos tipo resNFe,
+ * que não trazem esses campos separadamente.
+ */
+const extrairNumeroSerieDaChave = (chaveNFe) => {
+  if (!chaveNFe || chaveNFe.length !== 44) return { numero: 0, serie: 1 };
+  return {
+    serie: parseInt(chaveNFe.substring(22, 25), 10) || 1,
+    numero: parseInt(chaveNFe.substring(25, 34), 10) || 0
+  };
+};
+
+/**
+ * Interpreta um documento devolvido pela Distribuição DFe. A SEFAZ manda
+ * schemas diferentes conforme o caso:
+ * - resNFe_v1.01: resumo (sem XML completo da nota) — ainda dá pra listar
+ *   data/fornecedor/valor, mas o "download" só vai ter esse resumo mesmo.
+ * - procNFe/nfeProc: NF-e completa autorizada — dá pra baixar de verdade.
+ * - resEvento e outros: eventos (cancelamento, carta de correção etc.),
+ *   não são notas — ignorados aqui (não fazem sentido numa listagem de compras).
+ */
+const interpretarDocumento = async (doc) => {
+  const obj = await xmlParaObjeto(doc.xml);
+
+  if (obj.resNFe) {
+    const r = obj.resNFe;
+    const chaveNFe = r.chNFe?.[0] || null;
+    return {
+      chaveNFe,
+      cnpjFornecedor: r.CNPJ?.[0] || r.CPF?.[0] || null,
+      nomeFornecedor: r.xNome?.[0] || null,
+      valor: r.vNF?.[0] ? Number(r.vNF[0]) : null,
+      dataEmissao: r.dhEmi?.[0] || null,
+      xmlCompleto: false,
+      ...extrairNumeroSerieDaChave(chaveNFe)
+    };
+  }
+
+  const infNfe = obj.nfeProc?.NFe?.[0]?.infNfe?.[0] || obj.NFe?.infNfe?.[0];
+  if (infNfe) {
+    const ide = infNfe.ide?.[0] || {};
+    const emit = infNfe.emit?.[0] || {};
+    const total = infNfe.total?.[0]?.ICMSTot?.[0] || {};
+    const chaveNFe = infNfe.$?.Id?.replace('NFe', '') || null;
+    return {
+      chaveNFe,
+      cnpjFornecedor: emit.CNPJ?.[0] || null,
+      nomeFornecedor: emit.xNome?.[0] || null,
+      valor: total.vNF?.[0] ? Number(total.vNF[0]) : null,
+      dataEmissao: ide.dhEmi?.[0] || null,
+      xmlCompleto: true,
+      numero: ide.nNF?.[0] ? parseInt(ide.nNF[0], 10) : extrairNumeroSerieDaChave(chaveNFe).numero,
+      serie: ide.serie?.[0] ? parseInt(ide.serie[0], 10) : extrairNumeroSerieDaChave(chaveNFe).serie
+    };
+  }
+
+  return null; // schema não tratado (evento, etc.)
+};
+
+/**
+ * Pagina a Distribuição DFe do zero (NSU 0) até não haver mais documento
+ * novo, juntando tudo. Como a SEFAZ mantém os documentos disponíveis por um
+ * período limitado (não configurável por data), isso já cobre naturalmente
+ * o que estiver disponível — na prática, os últimos ~90 dias.
+ */
+const buscarTodosDocumentosDisponiveis = async (usuarioId, { cnpj, uf }) => {
+  let ultimoNSU = '0';
+  const documentos = [];
+
+  for (let pagina = 0; pagina < MAX_PAGINAS_POR_SINCRONIZACAO; pagina++) {
+    const resultado = await buscarNovasNotas(usuarioId, { cnpj, uf, ultimoNSU });
+
+    if (resultado.documentos?.length) {
+      documentos.push(...resultado.documentos);
+    }
+
+    // cStat 138 = "documento(s) localizado(s)"; qualquer outro código (137 =
+    // nenhum documento novo, entre outros) significa que já pegamos tudo.
+    if (resultado.cStat !== '138') {
+      return { documentos, cStat: resultado.cStat, xMotivo: resultado.xMotivo };
+    }
+
+    if (!resultado.ultimoNSU || (resultado.maxNSU && resultado.ultimoNSU >= resultado.maxNSU)) {
+      return { documentos, cStat: resultado.cStat, xMotivo: resultado.xMotivo };
+    }
+
+    ultimoNSU = resultado.ultimoNSU;
+  }
+
+  return { documentos, cStat: '138', xMotivo: `Limite de ${MAX_PAGINAS_POR_SINCRONIZACAO} páginas atingido — pode haver mais documentos não sincronizados` };
+};
+
+/**
+ * Busca tudo que a SEFAZ tiver disponível e salva como NF-e recebida (o
+ * que já existir, por chave de acesso, é ignorado — sem duplicar). Retorna
+ * um resumo pra UI, nunca o XML cru (isso fica pra tela de listagem).
+ */
+const sincronizarNotasRecebidas = async (usuarioId, { cnpj, uf }) => {
+  const { documentos, cStat, xMotivo } = await buscarTodosDocumentosDisponiveis(usuarioId, { cnpj, uf });
+
+  let novas = 0;
+  let ignoradas = 0;
+
+  for (const doc of documentos) {
+    const info = await interpretarDocumento(doc);
+    if (!info || !info.chaveNFe) {
+      ignoradas++;
+      continue;
+    }
+
+    const jaExiste = await NFe.findOne({ where: { usuarioId, chaveNFe: info.chaveNFe } });
+    if (jaExiste) {
+      ignoradas++;
+      continue;
+    }
+
+    await NFe.create({
+      usuarioId,
+      chaveNFe: info.chaveNFe,
+      cnpj: info.cnpjFornecedor || '00000000000000',
+      numero: info.numero,
+      serie: info.serie,
+      xmlContent: doc.xml,
+      direcao: 'recebida',
+      naturezaOperacao: info.xmlCompleto
+        ? 'Compra (via SEFAZ)'
+        : 'Resumo (via SEFAZ) — XML completo não disponibilizado para este documento',
+      dataEmissao: info.dataEmissao ? new Date(info.dataEmissao) : new Date(),
+      valor: info.valor,
+      // nomeCliente/cpfCnpjCliente guardam "a outra parte da nota" — aqui é
+      // o fornecedor, mesma convenção usada em importarNotaCompra (manual).
+      nomeCliente: info.nomeFornecedor,
+      cpfCnpjCliente: info.cnpjFornecedor,
+      statusSEFAZ: 'autorizada'
+    });
+    novas++;
+  }
+
+  return { totalDocumentos: documentos.length, novas, ignoradas, cStat, xMotivo };
+};
+
+module.exports = {
+  buscarNovasNotas,
+  buscarTodosDocumentosDisponiveis,
+  sincronizarNotasRecebidas,
+  montarEnvelopeDistDFe,
+  processarRespostaDistDFe
+};

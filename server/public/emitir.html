@@ -343,9 +343,10 @@
       </div>
 
       <div class="card">
-        <h2>Notas de compra reconhecidas <button class="btn small secondary" onclick="carregarNotasRecebidas()" style="margin-left:8px">Atualizar</button></h2>
+        <h2>Notas de compra (últimos 90 dias) <button class="btn small secondary" onclick="carregarNotasRecebidas()" style="margin-left:8px">Atualizar</button></h2>
+        <p class="hint">Reúne tanto as reconhecidas manualmente acima quanto as trazidas pela busca automática na SEFAZ.</p>
         <table>
-          <thead><tr><th>Fornecedor</th><th>Valor</th><th>Recebida em</th><th></th></tr></thead>
+          <thead><tr><th>Data</th><th>Fornecedor</th><th>Valor</th><th></th></tr></thead>
           <tbody id="corpoNotasRecebidas"></tbody>
         </table>
       </div>
@@ -1040,7 +1041,6 @@ async function carregarPerfil() {
   document.getElementById('empSegmento').value = empresa.segmentoTributario || 'padrao';
   document.getElementById('empAliquotaIbs').value = empresa.aliquotaIbsTeste;
   document.getElementById('empAliquotaCbs').value = empresa.aliquotaCbsTeste;
-  document.getElementById('certCnpj').value = empresa.cnpj;
   atualizarBadgeEmpresa();
 }
 
@@ -1505,13 +1505,25 @@ async function buscarNaSefaz() {
     return;
   }
 
-  if (!r.data.documentos || r.data.documentos.length === 0) {
-    resultadoEl.innerHTML = `<div class="resultado sucesso">✅ Consulta feita — nenhum documento novo (${r.data.xMotivo || 'sem novidades'})</div>`;
-    return;
+  if (!r.data.totalDocumentos) {
+    resultadoEl.innerHTML = `<div class="resultado sucesso">✅ Consulta feita — nenhum documento disponível (${r.data.xMotivo || 'sem novidades'})</div>`;
+  } else {
+    resultadoEl.innerHTML = `<div class="resultado sucesso">✅ ${r.data.totalDocumentos} documento(s) encontrado(s) na SEFAZ — ${r.data.novas} nova(s), ${r.data.ignoradas} já conhecida(s)/ignorada(s).</div>`;
   }
 
-  resultadoEl.innerHTML = `<div class="resultado sucesso">✅ ${r.data.documentos.length} documento(s) encontrado(s) — confira o console do navegador para o XML de cada um.</div>`;
-  console.log('Documentos recebidos da SEFAZ:', r.data.documentos);
+  carregarNotasRecebidas();
+}
+
+async function baixarXmlNFe(id, chaveNFe) {
+  const r = await api('GET', `/nfe/${id}/xml`);
+  if (!r.ok) return alert(r.data.error || 'Não foi possível obter o XML');
+
+  const blob = new Blob([r.data.xml], { type: 'application/xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${chaveNFe || id}.xml`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
 async function reconhecerNFeEntrada() {
@@ -1553,15 +1565,16 @@ async function reconhecerNFeEntrada() {
 }
 
 async function carregarNotasRecebidas() {
-  const r = await api('GET', '/nfe?limite=10&direcao=recebida');
+  const noventaDiasAtras = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
+  const r = await api('GET', `/nfe?limite=100&direcao=recebida&dataInicio=${noventaDiasAtras}`);
   if (!r.ok) return;
   document.getElementById('corpoNotasRecebidas').innerHTML = r.data.nfes.map(nfe => `
     <tr>
+      <td>${new Date(nfe.dataEmissao).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
       <td>${nfe.nomeCliente || '—'}</td>
       <td>R$ ${Number(nfe.valor || 0).toFixed(2)}</td>
-      <td>${new Date(nfe.dataEmissao).toLocaleString('pt-BR')}</td>
-      <td><button class="link-btn" onclick="verXml('${nfe.id}')">ver XML</button></td>
-    </tr>`).join('') || '<tr><td colspan="4" class="empty">Nenhuma nota de compra reconhecida ainda</td></tr>';
+      <td><button class="link-btn" onclick="verXml('${nfe.id}')">ver</button> · <button class="link-btn" onclick="baixarXmlNFe('${nfe.id}','${nfe.chaveNFe}')">baixar</button></td>
+    </tr>`).join('') || '<tr><td colspan="4" class="empty">Nenhuma nota de compra nos últimos 90 dias</td></tr>';
 }
 
 // ---------- Clientes (aba própria) ----------
