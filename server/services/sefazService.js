@@ -1,6 +1,6 @@
 const axios = require('axios');
-const fs = require('fs');
 const https = require('https');
+const { extrairPemDoPfx } = require('./certificadoPfxService');
 
 // URLs dos webservices SEFAZ por UF
 const URLS_SEFAZ = {
@@ -16,15 +16,19 @@ const URLS_SEFAZ = {
 };
 
 /**
- * Cria um agente HTTPS com certificado
+ * Cria um agente HTTPS com certificado. Usa o par cert/key já em PEM (ver
+ * certificadoPfxService.extrairPemDoPfx) em vez de { pfx, passphrase } — o
+ * parser de PKCS#12 nativo do Node/OpenSSL 3.x rejeita a cifra RC2-40-CBC
+ * que a maioria dos certificados A1 da ICP-Brasil usa, mesmo com a senha
+ * certa e o arquivo íntegro.
  */
 const criarAgenteCertificado = (caminhosCertificado, senhaCertificado) => {
   try {
-    const pfx = fs.readFileSync(caminhosCertificado);
-    
+    const { certPem, keyPem, caPem } = extrairPemDoPfx(caminhosCertificado, senhaCertificado);
     return new https.Agent({
-      pfx: pfx,
-      passphrase: senhaCertificado,
+      cert: certPem,
+      key: keyPem,
+      ca: caPem,
       rejectUnauthorized: false // ⚠️ Apenas para desenvolvimento
     });
   } catch (error) {

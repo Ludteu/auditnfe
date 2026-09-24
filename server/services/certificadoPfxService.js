@@ -2,14 +2,16 @@ const fs = require('fs');
 const forge = require('node-forge');
 
 /**
- * Abre o .pfx/.p12 de verdade com a senha informada e lê a validade direto
- * do certificado X.509 — em vez de pedir pro usuário digitar a data à mão
- * (que era só um número solto, sem relação nenhuma com o arquivo real).
- * Também serve como validação: se a senha estiver errada, o forge falha ao
- * abrir o PKCS#12 e a gente sabe na hora, no upload, em vez de descobrir só
- * quando o buscador da SEFAZ falhar silenciosamente depois.
+ * Abre o .pfx/.p12 com a senha informada. Centraliza os dois cuidados que
+ * fazem certificado real da ICP-Brasil funcionar aqui:
+ * - strict:false — o validador ASN.1 em modo estrito do forge rejeita a
+ *   estrutura de muitos certificados reais (cadeia de intermediárias,
+ *   atributos extras nos bags) mesmo com a senha certa.
+ * - Erros de senha errada (falha de MAC) são diferenciados de qualquer
+ *   outro erro real de leitura, que aparece com a mensagem técnica
+ *   original em vez de mascarada como "senha incorreta".
  */
-const lerCertificadoPfx = (caminhoArquivo, senha) => {
+const abrirPfx = (caminhoArquivo, senha) => {
   let p12Asn1;
   try {
     const bytes = fs.readFileSync(caminhoArquivo).toString('binary');
@@ -18,22 +20,22 @@ const lerCertificadoPfx = (caminhoArquivo, senha) => {
     throw new Error('Arquivo de certificado inválido ou corrompido.');
   }
 
-  let p12;
   try {
-    // strict:false — certificados reais da ICP-Brasil costumam trazer a
-    // cadeia de intermediárias e atributos extras nos bags que o validador
-    // ASN.1 em modo estrito do forge rejeita mesmo com a senha certa; isso
-    // fazia todo certificado real cair na mensagem de "senha incorreta".
-    p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, senha);
+    return forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, senha);
   } catch (error) {
     if (/mac could not be verified|invalid password/i.test(error.message)) {
       throw new Error('Senha do certificado incorreta.');
     }
-    // Qualquer outro erro é um problema real de leitura do arquivo (formato,
-    // algoritmo não suportado etc.) — mostrar a causa real em vez de
-    // esconder atrás de "senha incorreta", que só confunde o diagnóstico.
     throw new Error(`Não foi possível ler o certificado: ${error.message}`);
   }
+};
+
+/**
+ * Lê os metadados do certificado (validade, titular) — usado no upload pra
+ * validar a senha e preencher a validade sem pedir a data à mão.
+ */
+const lerCertificadoPfx = (caminhoArquivo, senha) => {
+  const p12 = abrirPfx(caminhoArquivo, senha);
 
   const bagsCertificado = p12.getBags({ bagType: forge.pki.oids.certBag });
   const bag = (bagsCertificado[forge.pki.oids.certBag] || [])[0];
@@ -48,4 +50,40 @@ const lerCertificadoPfx = (caminhoArquivo, senha) => {
   };
 };
 
-module.exports = { lerCertificadoPfx };
+/**
+ * Extrai a chave privada e o(s) certificado(s) do .pfx já em PEM, pra usar
+ * em https.Agent({ cert, key, ca }) em vez de https.Agent({ pfx, passphrase }).
+ * O motivo: a partir do OpenSSL 3.x (Node 17+), o parser nativo de PKCS#12
+ * do Node passa a rejeitar arquivos que usam RC2-40-CBC — exatamente a
+ * cifra que a maioria dos certificados A1 da ICP-Brasil usa — com o erro
+ * genérico "Unsupported PKCS12 PFX data", mesmo com a senha certa e o
+ * arquivo íntegro (o node-forge, sendo puro JS, não depende dos provedores
+ * do OpenSSL do sistema e não tem essa limitação). Decodificando aqui e
+ * entregando PEM pronto, o TLS do Node nunca precisa entender o PKCS#12.
+ */
+const extrairPemDoPfx = (caminhoArquivo, senha) => {
+  const p12 = abrirPfx(caminhoArquivo, senha);
+
+  const bagsChave = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+  const bagsChaveSimples = p12.getBags({ bagType: forge.pki.oids.keyBag });
+  const bagChave = (bagsChave[forge.pki.oids.pkcs8ShroudedKeyBag] || bagsChaveSimples[forge.pki.oids.keyBag] || [])[0];
+  if (!bagChave || !bagChave.key) {
+    throw new Error('Não foi possível encontrar a chave privada dentro do certificado.');
+  }
+
+  const bagsCertificado = p12.getBags({ bagType: forge.pki.oids.certBag });
+  const listaCertificados = bagsCertificado[forge.pki.oids.certBag] || [];
+  if (listaCertificados.length === 0) {
+    throw new Error('Não foi possível encontrar um certificado dentro do arquivo.');
+  }
+
+  const [certFolha, ...cadeia] = listaCertificados.map((bag) => bag.cert);
+
+  return {
+    keyPem: forge.pki.privateKeyToPem(bagChave.key),
+    certPem: forge.pki.certificateToPem(certFolha),
+    caPem: cadeia.length ? cadeia.map((cert) => forge.pki.certificateToPem(cert)).join('\n') : undefined
+  };
+};
+
+module.exports = { lerCertificadoPfx, extrairPemDoPfx };

@@ -14,13 +14,13 @@
  */
 
 const axios = require('axios');
-const fs = require('fs');
 const https = require('https');
 const zlib = require('zlib');
 const { xmlParaObjeto } = require('../utils/xmlHelper');
 const { CODIGO_UF } = require('./nfeXmlBuilder');
 const Certificado = require('../models/Certificado');
 const { descriptografar } = require('../utils/criptografia');
+const { extrairPemDoPfx } = require('./certificadoPfxService');
 
 // URLs do Ambiente Nacional (AN) — a Distribuição DFe é centralizada,
 // não usa os webservices estaduais de autorização.
@@ -29,9 +29,13 @@ const URLS_DISTRIBUICAO = {
   producao: 'https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx'
 };
 
+// Entrega o par cert/key já em PEM (ver certificadoPfxService.extrairPemDoPfx)
+// em vez de { pfx, passphrase } — o parser de PKCS#12 nativo do Node/OpenSSL
+// 3.x rejeita a cifra RC2-40-CBC que a maioria dos certificados A1 da
+// ICP-Brasil usa, mesmo com a senha certa.
 const criarAgenteCertificado = (caminhoArquivo, senha) => {
-  const pfx = fs.readFileSync(caminhoArquivo);
-  return new https.Agent({ pfx, passphrase: senha });
+  const { certPem, keyPem, caPem } = extrairPemDoPfx(caminhoArquivo, senha);
+  return new https.Agent({ cert: certPem, key: keyPem, ca: caPem });
 };
 
 const montarEnvelopeDistDFe = ({ tpAmb, cUFAutor, cnpj, ultNSU }) => {
