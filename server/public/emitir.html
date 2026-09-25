@@ -1155,6 +1155,7 @@ async function buscarCnpj() {
 
 async function salvarEmpresa() {
   const body = {
+    cnpj: document.getElementById('empCnpj').value.replace(/\D/g, ''),
     razaoSocial: document.getElementById('empRazaoSocial').value,
     nomeFantasia: document.getElementById('empNomeFantasia').value,
     uf: document.getElementById('empUf').value.toUpperCase(),
@@ -1171,6 +1172,7 @@ async function salvarEmpresa() {
   };
   const r = await api('PUT', '/usuarios/perfil', body);
   if (r.ok) { empresa = r.data.usuario; atualizarBadgeEmpresa(); }
+  else alert(r.data.error || 'Não foi possível salvar');
 }
 
 // ---------- Destinatário (aba Emitir) ----------

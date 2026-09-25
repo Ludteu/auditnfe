@@ -9,6 +9,7 @@ const { consultarCnpj } = require('../services/cnpjLookupService');
 const { SEGMENTOS_VALIDOS } = require('../services/reformaTributariaService');
 const { lerCertificadoPfx } = require('../services/certificadoPfxService');
 const { criptografar } = require('../utils/criptografia');
+const { validarCnpj, limparCnpj } = require('../utils/cnpjHelper');
 
 const router = express.Router();
 
@@ -66,11 +67,23 @@ router.get('/perfil', async (req, res) => {
  */
 router.put('/perfil', async (req, res) => {
   try {
-    const { nome, razaoSocial, regimeTributario, uf, nomeFantasia, cidade, cep, logradouro, numero, bairro, telefone, segmentoTributario, aliquotaIbsTeste, aliquotaCbsTeste } = req.body;
+    const { nome, cnpj, razaoSocial, regimeTributario, uf, nomeFantasia, cidade, cep, logradouro, numero, bairro, telefone, segmentoTributario, aliquotaIbsTeste, aliquotaCbsTeste } = req.body;
     const usuario = await Usuario.findByPk(req.usuario.id);
 
     if (!usuario) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    let cnpjMudou = false;
+    if (cnpj !== undefined) {
+      const cnpjLimpo = limparCnpj(cnpj);
+      if (!validarCnpj(cnpjLimpo)) {
+        return res.status(400).json({ error: 'CNPJ inválido — confira os dígitos verificadores' });
+      }
+      if (cnpjLimpo !== usuario.cnpj) {
+        usuario.cnpj = cnpjLimpo;
+        cnpjMudou = true;
+      }
     }
 
     const regimesValidos = ['simples_nacional', 'lucro_presumido', 'lucro_real'];
@@ -102,6 +115,16 @@ router.put('/perfil', async (req, res) => {
     if (aliquotaCbsTeste !== undefined) usuario.aliquotaCbsTeste = aliquotaCbsTeste;
 
     await usuario.save();
+
+    // Certificado é uma credencial operacional da empresa atual, não um
+    // documento histórico — se o CNPJ da conta era um placeholder (ex: o
+    // gerado automaticamente no cadastro rápido) e agora foi corrigido pro
+    // CNPJ real, os certificados já enviados acompanham a correção. Sem
+    // isso, eles ficam "órfãos": o certificado continua válido, mas as
+    // buscas por CNPJ (SEFAZ, assinatura) nunca mais encontram ele.
+    if (cnpjMudou) {
+      await Certificado.update({ cnpj: usuario.cnpj }, { where: { usuarioId: usuario.id } });
+    }
 
     res.json({
       mensagem: 'Perfil atualizado com sucesso',
