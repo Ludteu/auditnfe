@@ -1104,13 +1104,22 @@ async function carregarCertificados() {
         <td>${c.cnpj}</td>
         <td>${new Date(c.validoAte).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} ${vencido ? '<span class="pill err">vencido</span>' : ''}</td>
         <td><span class="pill ${c.ativo ? 'ok' : ''}">${c.ativo ? 'ativo' : 'inativo'}</span></td>
-        <td>${!c.ativo ? `<button class="link-btn" onclick="ativarCertificado('${c.id}')">ativar</button>` : ''}</td>
+        <td>
+          ${!c.ativo ? `<button class="link-btn" onclick="ativarCertificado('${c.id}')">ativar</button> · ` : ''}
+          <button class="link-btn" onclick="excluirCertificado('${c.id}')">excluir</button>
+        </td>
       </tr>`;
   }).join('') || '<tr><td colspan="5" class="empty">Nenhum certificado cadastrado ainda</td></tr>';
 }
 
 async function ativarCertificado(id) {
   const r = await api('PUT', '/usuarios/certificados/' + id + '/ativar');
+  if (r.ok) carregarCertificados(); else alert(r.data.error);
+}
+
+async function excluirCertificado(id) {
+  if (!confirm('Excluir este certificado? Essa ação não pode ser desfeita.')) return;
+  const r = await api('DELETE', '/usuarios/certificados/' + id);
   if (r.ok) carregarCertificados(); else alert(r.data.error);
 }
 

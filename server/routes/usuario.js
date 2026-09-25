@@ -217,6 +217,13 @@ router.post('/certificados/upload', uploadCertificado.single('certificado'), asy
       return res.status(400).json({ error: error.message });
     }
 
+    if (infoCertificado.cnpjCertificado && infoCertificado.cnpjCertificado !== usuario.cnpj) {
+      limpar();
+      return res.status(400).json({
+        error: `Esse certificado foi emitido para o CNPJ ${infoCertificado.cnpjCertificado}, mas a empresa cadastrada é ${usuario.cnpj}. Ajuste o CNPJ em "Minha empresa" ou envie o certificado correto.`
+      });
+    }
+
     const certificado = await Certificado.create({
       usuarioId: req.usuario.id,
       cnpj: usuario.cnpj,
@@ -284,9 +291,11 @@ router.delete('/certificados/:id', async (req, res) => {
       return res.status(404).json({ error: 'Certificado não encontrado' });
     }
 
+    const caminhoArquivo = certificado.caminhoArquivo;
     await certificado.destroy();
+    fs.unlink(caminhoArquivo, () => {}); // best-effort — o registro já foi removido de qualquer forma
 
-    res.json({ mensagem: 'Certificado deletado com sucesso' });
+    res.json({ mensagem: 'Certificado excluído com sucesso' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

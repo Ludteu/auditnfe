@@ -43,10 +43,17 @@ const lerCertificadoPfx = (caminhoArquivo, senha) => {
     throw new Error('Não foi possível encontrar um certificado dentro do arquivo.');
   }
 
+  const titular = bag.cert.subject.getField('CN')?.value || null;
+  // Certificado e-CNPJ da ICP-Brasil traz o CN no formato "RAZÃO SOCIAL:CNPJ"
+  // — é daqui que confirmamos que o arquivo enviado é mesmo da empresa
+  // cadastrada, sem depender do usuário digitar/conferir isso à mão.
+  const cnpjCertificado = titular?.match(/(\d{14})/)?.[1] || null;
+
   return {
     validoDesde: bag.cert.validity.notBefore,
     validoAte: bag.cert.validity.notAfter,
-    titular: bag.cert.subject.getField('CN')?.value || null
+    titular,
+    cnpjCertificado
   };
 };
 
