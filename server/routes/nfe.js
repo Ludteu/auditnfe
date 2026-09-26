@@ -62,4 +62,10 @@ router.get('/:chaveNFe/status', nfeController.consultarStatus);
  */
 router.get('/:id/xml', nfeController.obterXml);
 
+/**
+ * GET /api/nfe/:id/danfe
+ * Gerar o DANFE (PDF) da NF-e pra conferência
+ */
+router.get('/:id/danfe', nfeController.obterDanfe);
+
 module.exports = router;

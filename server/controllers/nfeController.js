@@ -1,9 +1,13 @@
 const NFe = require('../models/NFe');
 const Certificado = require('../models/Certificado');
+const ItemNFe = require('../models/ItemNFe');
+const Destinatario = require('../models/Destinatario');
+const Usuario = require('../models/Usuario');
 const { xmlParaObjeto, validarXmlBasico, extrairChaveNFe, formatarXml } = require('../utils/xmlHelper');
 const { assinarXml } = require('../services/assinaturaService');
 const { enviarNFeAutorizacao, consultarStatusNFe } = require('../services/sefazService');
 const emissaoService = require('../services/emissaoService');
+const danfeService = require('../services/danfeService');
 const { descriptografar } = require('../utils/criptografia');
 const { Op } = require('sequelize');
 
@@ -191,9 +195,10 @@ const assinar = async (req, res) => {
       descriptografar(certificado.senha)
     );
 
-    // Salvar XML assinado
+    // Salvar XML assinado. Não muda statusSEFAZ aqui — "pronta_para_envio"
+    // não existe no enum do model (ver NFe.js); o status só avança de
+    // verdade em enviar(), quando a SEFAZ (real ou simulada) responde.
     nfe.xmlAssinado = xmlAssinado;
-    nfe.statusSEFAZ = 'pronta_para_envio';
     await nfe.save();
 
     res.json({
@@ -234,21 +239,27 @@ const enviar = async (req, res) => {
       return res.status(404).json({ error: 'Certificado não encontrado' });
     }
 
+    // CNPJ não tem a UF codificada em lugar nenhum dos dígitos (isso é
+    // só verdade pro CPF, e olhe lá) — a UF certa é a cadastrada em
+    // "Minha empresa", a mesma usada pra montar a NF-e.
+    const emitente = await Usuario.findByPk(usuarioId);
+
     // Enviar para SEFAZ
     const resposta = await enviarNFeAutorizacao(
       nfe.xmlAssinado,
       certificado.caminhoArquivo,
       descriptografar(certificado.senha),
-      nfe.cnpj.substring(8, 10) // UF extraída do CNPJ
+      emitente?.uf
     );
 
-    // Atualizar status
-    nfe.statusSEFAZ = resposta.statusNFe || 'enviada';
+    // Atualizar status com a resposta REAL da SEFAZ (nunca fabricada)
+    nfe.statusSEFAZ = resposta.statusNFe;
     nfe.protocolo = resposta.protocolo;
+    nfe.descricaoRejeicao = resposta.statusNFe === 'rejeitada' ? resposta.xMotivo : null;
     await nfe.save();
 
     res.json({
-      mensagem: 'NF-e enviada com sucesso',
+      mensagem: resposta.statusNFe === 'autorizada' ? 'NF-e autorizada pela SEFAZ' : 'NF-e enviada, mas rejeitada pela SEFAZ',
       nfe,
       resposta
     });
@@ -331,6 +342,54 @@ const obterXml = async (req, res) => {
 };
 
 /**
+ * GET /api/nfe/:id/danfe
+ * Gera o DANFE em PDF pra conferência — de registros estruturados quando
+ * a nota é emitida por esta empresa, ou lendo o XML quando é uma nota
+ * recebida (só existe o XML). Ver aviso de "sem valor fiscal" dentro de
+ * danfeService.js: o PDF nunca finge uma autorização que não existe.
+ */
+const obterDanfe = async (req, res) => {
+  try {
+    const usuarioId = req.usuario.id;
+    const { id } = req.params;
+
+    const nfe = await NFe.findOne({
+      where: { [Op.or]: [{ id }, { chaveNFe: id }], usuarioId }
+    });
+
+    if (!nfe) {
+      return res.status(404).json({ error: 'NF-e não encontrada' });
+    }
+
+    let dados;
+    if (nfe.direcao === 'emitida') {
+      const [itens, emitente, destinatario] = await Promise.all([
+        ItemNFe.findAll({ where: { nfeId: nfe.id } }),
+        Usuario.findByPk(usuarioId),
+        nfe.destinatarioId ? Destinatario.findByPk(nfe.destinatarioId) : null
+      ]);
+      dados = danfeService.montarDadosDeRegistrosLocais({ nfe, itens, emitente, destinatario });
+    } else {
+      dados = await danfeService.montarDadosDeXml(nfe.xmlContent);
+      if (!dados) {
+        return res.status(422).json({
+          error: 'Esse documento é só um resumo trazido pela SEFAZ (sem o XML completo da nota) — não há itens suficientes pra montar um DANFE.'
+        });
+      }
+    }
+
+    const pdf = await danfeService.gerarDanfePdf(dados);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="DANFE-${nfe.chaveNFe}.pdf"`
+    });
+    res.send(pdf);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
  * Emite uma NF-e a partir de dados estruturados (destinatário + itens do
  * catálogo de produtos). A lógica de verdade mora em emissaoService.js —
  * este handler só traduz requisição HTTP <-> chamada de serviço, porque
@@ -355,5 +414,6 @@ module.exports = {
   enviar,
   consultarStatus,
   obterXml,
+  obterDanfe,
   emitir
 };
