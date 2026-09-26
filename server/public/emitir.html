@@ -1403,15 +1403,23 @@ async function emitirNFe() {
 }
 
 async function verDanfe(nfeId) {
+  // Abre a aba já aqui, ainda de forma síncrona dentro do clique — se
+  // isso acontecer só depois do fetch/await, o navegador não reconhece
+  // mais como ação direta do usuário e bloqueia a aba em silêncio (sem
+  // erro nenhum, só "não abre nada").
+  const janela = window.open('', '_blank');
   try {
     const res = await fetch(baseUrl + '/nfe/' + nfeId + '/danfe', { headers: { Authorization: 'Bearer ' + token } });
     if (!res.ok) {
       const erro = await res.json().catch(() => ({}));
+      janela?.close();
       return alert(erro.error || 'Não foi possível gerar o DANFE');
     }
     const blob = await res.blob();
-    window.open(URL.createObjectURL(blob), '_blank');
+    if (janela) janela.location.href = URL.createObjectURL(blob);
+    else alert('O navegador bloqueou a aba do DANFE. Permita pop-ups para este site e tente de novo.');
   } catch (error) {
+    janela?.close();
     alert(error.message);
   }
 }
