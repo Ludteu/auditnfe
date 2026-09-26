@@ -1382,17 +1382,68 @@ async function emitirNFe() {
   btn.disabled = false; btn.textContent = 'Emitir NF-e';
 
   if (r.ok) {
+    const nfeId = r.data.nfe.id;
     resultadoEl.innerHTML = `
       <div class="resultado sucesso">
         <strong>✅ NF-e nº ${r.data.nfe.numero} emitida com sucesso</strong> — total R$ ${r.data.nfe.valor}
         <div class="chave">Chave: ${r.data.nfe.chaveNFe}</div>
         ${r.data.avisos?.length ? '<div class="avisos" style="margin-top:8px"><ul>' + r.data.avisos.map(a => `<li>${a}</li>`).join('') + '</ul></div>' : ''}
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn secondary" onclick="verDanfe('${nfeId}')">Pré-visualizar DANFE</button>
+          <button class="btn" id="btnTransmitir-${nfeId}" onclick="transmitirNFe('${nfeId}', this)">Transmitir para a SEFAZ</button>
+        </div>
+        <p class="hint" style="margin-top:6px">"Transmitir" tenta autorizar de verdade na SEFAZ (exige certificado real cadastrado nesse CNPJ). A assinatura digital deste sistema ainda é simplificada — é esperado que a SEFAZ rejeite até isso ser implementado por completo.</p>
+        <div id="statusTransmissao-${nfeId}"></div>
       </div>`;
     itens = []; limparDestinatario(); renderizarItens(); carregarNFes();
     document.getElementById('observacoesNota').value = '';
   } else {
     resultadoEl.innerHTML = `<div class="resultado erro">❌ ${r.data.error}</div>`;
   }
+}
+
+async function verDanfe(nfeId) {
+  try {
+    const res = await fetch(baseUrl + '/nfe/' + nfeId + '/danfe', { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) {
+      const erro = await res.json().catch(() => ({}));
+      return alert(erro.error || 'Não foi possível gerar o DANFE');
+    }
+    const blob = await res.blob();
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+async function transmitirNFe(nfeId, btn) {
+  const statusEl = document.getElementById('statusTransmissao-' + nfeId);
+  const textoOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Transmitindo...';
+  statusEl.innerHTML = '';
+
+  const assinatura = await api('POST', `/nfe/${nfeId}/assinar`);
+  if (!assinatura.ok) {
+    statusEl.innerHTML = `<div class="resultado erro">❌ Falha ao assinar: ${assinatura.data.error}</div>`;
+    btn.disabled = false; btn.textContent = textoOriginal;
+    return;
+  }
+
+  const envio = await api('POST', `/nfe/${nfeId}/enviar`);
+  btn.disabled = false; btn.textContent = textoOriginal;
+
+  if (!envio.ok) {
+    statusEl.innerHTML = `<div class="resultado erro">❌ ${envio.data.error}</div>`;
+    return;
+  }
+
+  const autorizada = envio.data.nfe.statusSEFAZ === 'autorizada';
+  statusEl.innerHTML = `
+    <div class="resultado ${autorizada ? 'sucesso' : 'erro'}">
+      ${autorizada ? '✅ Autorizada pela SEFAZ' : '❌ Rejeitada pela SEFAZ'} — Protocolo: ${envio.data.nfe.protocolo || '—'}
+      ${envio.data.resposta?.xMotivo ? `<div style="margin-top:4px">${envio.data.resposta.xMotivo}</div>` : ''}
+    </div>`;
+  carregarNFes();
 }
 
 // ---------- Marketplace ----------
@@ -1496,7 +1547,7 @@ async function carregarNFes() {
       <td>R$ ${Number(nfe.valor || 0).toFixed(2)}</td>
       <td><span class="pill">${nfe.statusSEFAZ}</span></td>
       <td>${new Date(nfe.dataEmissao).toLocaleString('pt-BR')}</td>
-      <td><button class="link-btn" onclick="verXml('${nfe.id}')">ver XML</button></td>
+      <td><button class="link-btn" onclick="verXml('${nfe.id}')">ver XML</button> · <button class="link-btn" onclick="verDanfe('${nfe.id}')">ver DANFE</button></td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">Nenhuma NF-e emitida ainda</td></tr>';
 }
 
@@ -1602,7 +1653,7 @@ async function carregarNotasRecebidas() {
       <td>${new Date(nfe.dataEmissao).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
       <td>${nfe.nomeCliente || '—'}</td>
       <td>R$ ${Number(nfe.valor || 0).toFixed(2)}</td>
-      <td><button class="link-btn" onclick="verXml('${nfe.id}')">ver</button> · <button class="link-btn" onclick="baixarXmlNFe('${nfe.id}','${nfe.chaveNFe}')">baixar</button></td>
+      <td><button class="link-btn" onclick="verXml('${nfe.id}')">ver</button> · <button class="link-btn" onclick="baixarXmlNFe('${nfe.id}','${nfe.chaveNFe}')">baixar</button> · <button class="link-btn" onclick="verDanfe('${nfe.id}')">DANFE</button></td>
     </tr>`).join('') || '<tr><td colspan="4" class="empty">Nenhuma nota de compra nos últimos 90 dias</td></tr>';
 }
 
