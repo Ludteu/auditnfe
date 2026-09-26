@@ -1,6 +1,33 @@
 const axios = require('axios');
 const https = require('https');
 const { extrairPemDoPfx } = require('./certificadoPfxService');
+const { xmlParaObjeto } = require('../utils/xmlHelper');
+
+/**
+ * Procura uma tag em qualquer profundidade do objeto que o xml2js gera
+ * (tudo vem como array em cada nível) — usado pra achar cStat/xMotivo/
+ * nProt/nRec na resposta da SEFAZ sem depender de saber a estrutura
+ * exata de envelope de cada UF (varia entre síncrono e assíncrono).
+ */
+const buscarTag = (obj, tag) => {
+  if (!obj || typeof obj !== 'object') return null;
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const achado = buscarTag(item, tag);
+      if (achado != null) return achado;
+    }
+    return null;
+  }
+  if (tag in obj) {
+    const valor = obj[tag];
+    return Array.isArray(valor) ? valor[0] : valor;
+  }
+  for (const chave of Object.keys(obj)) {
+    const achado = buscarTag(obj[chave], tag);
+    if (achado != null) return achado;
+  }
+  return null;
+};
 
 // URLs dos webservices SEFAZ por UF
 const URLS_SEFAZ = {
@@ -61,13 +88,13 @@ const enviarNFeAutorizacao = async (xmlAssinado, certificado, senhaCertificado, 
     const response = await axios.post(url, soap, {
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
-        'SOAPAction': ''
+        SOAPAction: 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4/nfeAutorizacaoLote'
       },
       httpsAgent: agente,
       timeout: parseInt(process.env.SEFAZ_TIMEOUT || 30000)
     });
 
-    return parseResponstaAutorizacao(response.data);
+    return await parseResponstaAutorizacao(response.data);
   } catch (error) {
     throw new Error(`Erro ao enviar NF-e para SEFAZ: ${error.message}`);
   }
@@ -99,49 +126,72 @@ const consultarStatusNFe = async (chaveNFe, certificado, senhaCertificado, uf = 
     const response = await axios.post(url, soap, {
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
-        'SOAPAction': ''
+        SOAPAction: 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeConsultaProtocolo4/nfeConsultaNF'
       },
       httpsAgent: agente,
       timeout: parseInt(process.env.SEFAZ_TIMEOUT || 30000)
     });
 
-    return parseRespostaConsulta(response.data);
+    return await parseRespostaConsulta(response.data);
   } catch (error) {
     throw new Error(`Erro ao consultar NF-e: ${error.message}`);
   }
 };
 
 /**
- * Parse da resposta de autorização
+ * Parse da resposta REAL de autorização. Nunca inventa um protocolo — só
+ * reporta "autorizada" quando a SEFAZ de verdade mandou cStat 100 com um
+ * nProt junto. As UFs mais modernas respondem de forma assíncrona (dão só
+ * um recibo de lote, cStat 103/104, e a confirmação real vem de uma
+ * segunda chamada a NFeRetAutorizacao4, que este sistema ainda não
+ * implementa) — nesse caso falha com uma mensagem clara em vez de fingir
+ * que já sabe o resultado.
  */
-const parseResponstaAutorizacao = (respostaSoap) => {
-  try {
-    // Aqui você faria o parsing da resposta XML da SEFAZ
-    // Por enquanto, retornamos um objeto simulado
-    return {
-      sucesso: true,
-      protocolo: '135200000000000',
-      statusNFe: 'autorizada',
-      dhRecebimento: new Date()
-    };
-  } catch (error) {
-    throw new Error(`Erro ao processar resposta: ${error.message}`);
+const parseResponstaAutorizacao = async (respostaSoap) => {
+  const obj = await xmlParaObjeto(respostaSoap);
+  const cStat = buscarTag(obj, 'cStat');
+  const xMotivo = buscarTag(obj, 'xMotivo');
+  const nProt = buscarTag(obj, 'nProt');
+  const nRec = buscarTag(obj, 'nRec');
+
+  if (!cStat) {
+    throw new Error('Resposta da SEFAZ em formato inesperado — não foi possível localizar o status (cStat) nela. Confira o XML retornado manualmente.');
   }
+
+  if (cStat === '100' && nProt) {
+    return { statusNFe: 'autorizada', protocolo: nProt, cStat, xMotivo };
+  }
+
+  if (nRec && !nProt) {
+    throw new Error(
+      `A SEFAZ recebeu o lote (recibo ${nRec}, cStat ${cStat} — ${xMotivo || 'processamento assíncrono'}), mas a consulta do resultado final ` +
+      '(webservice NFeRetAutorizacao4) ainda não está implementada neste sistema — não dá pra confirmar autorização automaticamente ainda.'
+    );
+  }
+
+  return { statusNFe: 'rejeitada', protocolo: null, cStat, xMotivo: xMotivo || 'Rejeitada pela SEFAZ (motivo não identificado na resposta)' };
 };
 
 /**
- * Parse da resposta de consulta
+ * Parse da resposta REAL de consulta de protocolo — mesma lógica: só
+ * reporta o que a SEFAZ respondeu de verdade.
  */
-const parseRespostaConsulta = (respostaSoap) => {
-  try {
-    return {
-      statusNFe: 'autorizada',
-      protocolo: '135200000000000',
-      dhRecebimento: new Date()
-    };
-  } catch (error) {
-    throw new Error(`Erro ao processar resposta: ${error.message}`);
+const parseRespostaConsulta = async (respostaSoap) => {
+  const obj = await xmlParaObjeto(respostaSoap);
+  const cStat = buscarTag(obj, 'cStat');
+  const xMotivo = buscarTag(obj, 'xMotivo');
+  const nProt = buscarTag(obj, 'nProt');
+
+  if (!cStat) {
+    throw new Error('Resposta da SEFAZ em formato inesperado — não foi possível localizar o status (cStat) nela.');
   }
+
+  return {
+    statusNFe: cStat === '100' ? 'autorizada' : 'rejeitada',
+    protocolo: nProt || null,
+    cStat,
+    xMotivo
+  };
 };
 
 /**
