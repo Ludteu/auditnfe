@@ -1106,7 +1106,7 @@ async function carregarCertificados() {
         <td><span class="pill ${c.ativo ? 'ok' : ''}">${c.ativo ? 'ativo' : 'inativo'}</span></td>
         <td>
           ${!c.ativo ? `<button class="link-btn" onclick="ativarCertificado('${c.id}')">ativar</button> · ` : ''}
-          <button class="link-btn" onclick="excluirCertificado('${c.id}')">excluir</button>
+          <button class="link-btn" onclick="excluirCertificado('${c.id}', this)">excluir</button>
         </td>
       </tr>`;
   }).join('') || '<tr><td colspan="5" class="empty">Nenhum certificado cadastrado ainda</td></tr>';
@@ -1117,8 +1117,26 @@ async function ativarCertificado(id) {
   if (r.ok) carregarCertificados(); else alert(r.data.error);
 }
 
-async function excluirCertificado(id) {
-  if (!confirm('Excluir este certificado? Essa ação não pode ser desfeita.')) return;
+const certificadosPendentesExclusao = new Set();
+
+// Confirmação inline em vez de confirm() nativo — em alguns navegadores/
+// contextos o diálogo nativo não aparece de forma confiável, fazendo o
+// clique parecer que "não faz nada". Clique 1 pede confirmação no próprio
+// botão; clique 2 (em até 4s) exclui de verdade.
+async function excluirCertificado(id, btn) {
+  if (!certificadosPendentesExclusao.has(id)) {
+    certificadosPendentesExclusao.add(id);
+    const textoOriginal = btn.textContent;
+    btn.textContent = 'confirmar exclusão?';
+    setTimeout(() => {
+      if (certificadosPendentesExclusao.delete(id) && btn.isConnected) {
+        btn.textContent = textoOriginal;
+      }
+    }, 4000);
+    return;
+  }
+
+  certificadosPendentesExclusao.delete(id);
   const r = await api('DELETE', '/usuarios/certificados/' + id);
   if (r.ok) carregarCertificados(); else alert(r.data.error);
 }

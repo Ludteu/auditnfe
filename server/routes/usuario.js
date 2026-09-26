@@ -74,16 +74,12 @@ router.put('/perfil', async (req, res) => {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
-    let cnpjMudou = false;
     if (cnpj !== undefined) {
       const cnpjLimpo = limparCnpj(cnpj);
       if (!validarCnpj(cnpjLimpo)) {
         return res.status(400).json({ error: 'CNPJ inválido — confira os dígitos verificadores' });
       }
-      if (cnpjLimpo !== usuario.cnpj) {
-        usuario.cnpj = cnpjLimpo;
-        cnpjMudou = true;
-      }
+      usuario.cnpj = cnpjLimpo;
     }
 
     const regimesValidos = ['simples_nacional', 'lucro_presumido', 'lucro_real'];
@@ -115,16 +111,6 @@ router.put('/perfil', async (req, res) => {
     if (aliquotaCbsTeste !== undefined) usuario.aliquotaCbsTeste = aliquotaCbsTeste;
 
     await usuario.save();
-
-    // Certificado é uma credencial operacional da empresa atual, não um
-    // documento histórico — se o CNPJ da conta era um placeholder (ex: o
-    // gerado automaticamente no cadastro rápido) e agora foi corrigido pro
-    // CNPJ real, os certificados já enviados acompanham a correção. Sem
-    // isso, eles ficam "órfãos": o certificado continua válido, mas as
-    // buscas por CNPJ (SEFAZ, assinatura) nunca mais encontram ele.
-    if (cnpjMudou) {
-      await Certificado.update({ cnpj: usuario.cnpj }, { where: { usuarioId: usuario.id } });
-    }
 
     res.json({
       mensagem: 'Perfil atualizado com sucesso',
@@ -226,7 +212,11 @@ router.post('/certificados/upload', uploadCertificado.single('certificado'), asy
 
     const certificado = await Certificado.create({
       usuarioId: req.usuario.id,
-      cnpj: usuario.cnpj,
+      // Prioriza o CNPJ lido de dentro do próprio arquivo (fato imutável
+      // sobre ESSE certificado) sobre o da empresa (que pode mudar depois,
+      // se o usuário corrigir o cadastro) — assim o certificado nunca fica
+      // "seguindo" um CNPJ que não é o dele de verdade.
+      cnpj: infoCertificado.cnpjCertificado || usuario.cnpj,
       validoAte: infoCertificado.validoAte,
       descricao: descricao || infoCertificado.titular || req.file.originalname,
       caminhoArquivo: req.file.path,
